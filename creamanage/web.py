@@ -12,6 +12,7 @@ from aiohttp import WSMsgType, web
 
 from . import k2_protokol as P
 from .filo import Filo
+from .telegram import TelegramBildirici
 from .surum import FIRMA, SURUM, URUN_ADI, URUN_KODU
 
 log = logging.getLogger("creamanage.web")
@@ -45,7 +46,7 @@ def _ip_dogrula(ip: str) -> str:
         raise web.HTTPBadRequest(text=f"geçersiz IP: {ip}")
 
 
-def uygulama_olustur(filo: Filo) -> web.Application:
+def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> web.Application:
     app = web.Application()
     app[FILO_ANAHTAR] = filo
     app[WS_ISTEMCILER] = weakref.WeakSet()
@@ -185,6 +186,43 @@ def uygulama_olustur(filo: Filo) -> web.Application:
         limit = min(int(istek.query.get("limit", "100")), 1000)
         return _json({"olaylar": filo.vt.olaylar(limit)})
 
+    # --- Telegram bildirim ayarları ---
+    def _tg() -> TelegramBildirici:
+        if telegram is None:
+            raise web.HTTPNotFound(text="Telegram kanalı etkin değil")
+        return telegram
+
+    async def telegram_oku(_):
+        return _json({"telegram": _tg().gorunum()})
+
+    async def telegram_yaz(istek):
+        v = await _govde(istek)
+        return _json({"telegram": _tg().kaydet(v)})
+
+    async def telegram_test(istek):
+        v = await _govde(istek)
+        tg = _tg()
+        token = str(v.get("token") or "").strip() or None
+        sohbetler = v.get("sohbetler")
+        sohbetler = [str(x).strip() for x in sohbetler if str(x).strip()] if isinstance(sohbetler, list) else None
+        if not (token or tg.ayar["token"]):
+            return _hata("bot belirteci girilmemiş")
+        if not (sohbetler or tg.ayar["sohbetler"]):
+            return _hata("sohbet kimliği girilmemiş")
+        hatalar = await tg.test_mesaji(token, sohbetler)
+        return _json({"basarili": not hatalar, "hatalar": hatalar})
+
+    async def telegram_sohbetler(istek):
+        v = await _govde(istek)
+        tg = _tg()
+        token = str(v.get("token") or "").strip() or None
+        try:
+            bot = await tg.bot_bilgisi(token)
+            sohbetler = await tg.sohbetleri_bul(token)
+        except Exception as e:  # noqa: BLE001
+            return _hata(f"Telegram: {e}", 502)
+        return _json({"bot": bot, "sohbetler": sohbetler})
+
     async def ws_ucu(istek):
         ws = web.WebSocketResponse(heartbeat=25)
         await ws.prepare(istek)
@@ -215,6 +253,10 @@ def uygulama_olustur(filo: Filo) -> web.Application:
     app.router.add_get("/api/tarama", tarama_durum)
     app.router.add_post("/api/tarama/iptal", tarama_iptal)
     app.router.add_get("/api/olaylar", olaylar)
+    app.router.add_get("/api/ayarlar/telegram", telegram_oku)
+    app.router.add_put("/api/ayarlar/telegram", telegram_yaz)
+    app.router.add_post("/api/ayarlar/telegram/test", telegram_test)
+    app.router.add_post("/api/ayarlar/telegram/sohbetler", telegram_sohbetler)
     app.router.add_get("/ws", ws_ucu)
     app.router.add_static("/static/", WEB_DIZIN, show_index=False)
 

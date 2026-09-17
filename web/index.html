@@ -19,6 +19,7 @@
   <div class="sayaclar" id="sayaclar"></div>
   <div class="eylemler">
     <span id="baglanti-rozeti" class="rozet rozet-kopuk">Sunucu bağlantısı yok</span>
+    <button class="btn" id="btn-bildirim" title="Telegram bildirim ayarları">Bildirimler</button>
     <button class="btn btn-birincil" id="btn-sihirbaz">+ Yazıcı Ekle</button>
   </div>
 </header>
@@ -144,6 +145,36 @@
         <button class="btn btn-birincil" id="btn-ekle">Seçilenleri Ekle</button>
       </div>
     </section>
+  </div>
+</div>
+
+<!-- Bildirim ayarları -->
+<div class="ortu" id="ortu-bildirim" hidden>
+  <div class="modal">
+    <div class="modal-baslik">
+      <h2>Telegram Bildirimleri</h2>
+      <button class="btn btn-ikincil" data-kapat="ortu-bildirim">Kapat</button>
+    </div>
+    <p class="ipucu">Telegram'da <b>@BotFather</b>'a <code>/newbot</code> yazıp bir bot oluşturun, verdiği belirteci aşağıya yapıştırın.
+      Bildirim alacak kişi (ya da grup) bota bir kez <code>/start</code> yazsın; sonra "Sohbetleri Bul" ile kimliği seçin.</p>
+    <form class="form" id="tg-form">
+      <label>Bot belirteci <input name="token" type="password" autocomplete="off" placeholder="123456789:AA…"><small class="ipucu" id="tg-token-durum"></small></label>
+      <div class="satir">
+        <label class="genis">Sohbet kimlikleri (virgülle) <input name="sohbetler" placeholder="123456789, -1001234567890"></label>
+        <button class="btn" type="button" id="tg-sohbet-bul">Sohbetleri Bul</button>
+      </div>
+      <div id="tg-sohbet-liste" class="secenekler kucuk-liste"></div>
+      <fieldset class="olay-secim">
+        <legend>Hangi olaylarda bildirim gönderilsin?</legend>
+        <div id="tg-olaylar"></div>
+      </fieldset>
+      <label class="satir"><input name="etkin" type="checkbox"> Telegram bildirimleri etkin</label>
+      <div class="satir">
+        <button class="btn btn-birincil" type="submit">Kaydet</button>
+        <button class="btn" type="button" id="tg-test">Test Mesajı Gönder</button>
+        <span class="ipucu" id="tg-durum"></span>
+      </div>
+    </form>
   </div>
 </div>
 

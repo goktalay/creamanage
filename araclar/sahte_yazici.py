@@ -101,6 +101,9 @@ class SahteYazici:
                                "targetNozzleTemp": 0, "targetBedTemp0": 0})
         if "lightSw" in p:
             self.durum["lightSw"] = int(p["lightSw"])
+        op = p.get("opGcodeFile")
+        if isinstance(op, str) and op.startswith("printprt:"):
+            self.baski_baslat(op.split("/")[-1] or "dosya.gcode", katman=100)
         if "nozzleTempControl" in p:
             self.durum["targetNozzleTemp"] = float(p["nozzleTempControl"])
         if isinstance(p.get("bedTempControl"), dict):
@@ -157,8 +160,9 @@ async def ana(argv=None) -> None:
     p.add_argument("--adet", type=int, default=5)
     p.add_argument("--baslangic", type=int, default=2, help="127.0.0.<N> başlangıcı")
     p.add_argument("--port", type=int, default=P.WS_PORT)
+    p.add_argument("--hizli", action="store_true", help="baskılar saniyeler içinde biter (tanıtım/test)")
     n = p.parse_args(argv)
-    yazicilar = await filo_kur(n.adet, n.baslangic, n.port)
+    yazicilar = await filo_kur(n.adet, n.baslangic, n.port, n.hizli)
     for i, y in enumerate(yazicilar):
         if i % 2 == 0:
             y.baski_baslat(f"parca_{i + 1}.gcode", katman=100 + i * 10)

@@ -79,7 +79,8 @@ def gecis_olaylari(ad: str, eski: dict | None, yeni: dict) -> list[tuple[str, st
         elif y_d == P.D_BASIYOR and e_d == P.D_DURAKLATILDI:
             olaylar.append((O_SURDURULDU, f"{ad}: baskı sürdürüldü", {"dosya": dosya}))
         elif y_d == P.D_TAMAMLANDI:
-            olaylar.append((O_BASKI_BITTI, f"{ad}: baskı tamamlandı {dosya}".strip(), {"dosya": dosya}))
+            olaylar.append((O_BASKI_BITTI, f"{ad}: baskı tamamlandı {dosya}".strip(),
+                            {"dosya": dosya, "sure_sn": yeni.get("gecen_sn")}))
         elif y_d == P.D_DURAKLATILDI:
             olaylar.append((O_DURAKLATILDI, f"{ad}: baskı duraklatıldı", {"dosya": dosya}))
         elif y_d == P.D_HATA:

@@ -6,7 +6,7 @@ Creality **K2 Plus (Combo)** 3D yazıcı filosunu (hedef: 56 cihaz) yerel ağ ü
 Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sunduğu
 **WebSocket 9999** arayüzü kullanılır (root, Moonraker, bulut yok). Garanti korunur.
 
-## Sürüm 0.1.0 — ne yapar
+## Sürüm 0.2.0 — ne yapar
 
 - **Ağ tarama sihirbazı:** makinedeki alt ağları listeler, seçilen CIDR'da 9999 portunu
   paralel yoklar, yanıt verenlere WebSocket ile kimlik (hostname, model) sorar; bulunanları
@@ -20,7 +20,10 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
   tabla, fan.)
 - **Olay akışı:** bağlantı kuruldu/koptu, baskı başladı/bitti/duraklatıldı, hata,
   filament bitti. SQLite'a yazılır, arayüze anlık itilir.
-- **Kalıcı kayıt:** `creamanage.sqlite` (yazıcılar + olaylar). Sır içermez.
+- **Telegram bildirimleri:** hata oluştuğunda ve baskı tamamlandığında (isteğe bağlı:
+  filament bitti, bağlantı koptu/kuruldu, hata giderildi, duraklatıldı, başladı) seçilen
+  kişi ya da gruplara mesaj. Aynı anda oluşan olaylar tek mesajda toplanır.
+- **Kalıcı kayıt:** `creamanage.sqlite` (yazıcılar + olaylar + ayarlar). Depoya girmez.
 
 ## Kurulum ve çalıştırma
 
@@ -39,10 +42,24 @@ Ortam değişkenleri: `CREAMANAGE_HOST`, `CREAMANAGE_PORT`, `CREAMANAGE_VERITABA
 Sunucu, yazıcılarla **aynı yerel ağda** (ya da 9999 portuna yönlendirilmiş bir ağda)
 olmalıdır. Tarama için alt ağ en fazla /20 (4096 adres) olabilir.
 
+### Telegram bildirimlerini açma
+
+1. Telegram'da **@BotFather**'a `/newbot` yazın, bot adı verin; verdiği belirteci
+   (`123456789:AA…`) kopyalayın.
+2. Bildirim alacak kişi bota bir kez `/start` yazsın. Grup için botu gruba ekleyin ve
+   grupta bir mesaj yazın.
+3. CreaManage'de sağ üstte **Bildirimler** → belirteci yapıştırın → **Sohbetleri Bul** →
+   listeden kişiyi/grubu işaretleyin → hangi olaylarda bildirim istediğinizi seçin →
+   **Telegram bildirimleri etkin** → **Kaydet**. **Test Mesajı Gönder** ile doğrulayın.
+
+Belirteç yalnız sunucudaki `creamanage.sqlite` içinde tutulur; arayüze maskelenmiş döner.
+Sunucunun `api.telegram.org` adresine internet erişimi olmalıdır (yazıcı ağı kapalıysa
+sunucuya ikinci bir ağ bağlantısı ya da vekil gerekir).
+
 ### Donanımsız deneme (simülatör)
 
 ```bash
-python3 araclar/sahte_yazici.py --adet 6      # 127.0.0.2 … 127.0.0.7 : 9999
+python3 araclar/sahte_yazici.py --adet 6      # 127.0.0.2 … 127.0.0.7 : 9999  (--hizli: baskı saniyeler içinde biter)
 python3 main.py --port 8090
 # Arayüzde "Yazıcı Ekle" → CIDR 127.0.0.0/28 → Tara
 ```
@@ -53,8 +70,11 @@ Simülatör telemetri, kalp atışı ve `pause/stop/lightSw` komutlarını takli
 
 ```bash
 cd testler
-python3 -m unittest -v test_k2_protokol test_filo_uctan_uca
+python3 -m unittest -v test_k2_protokol test_filo_uctan_uca test_telegram
 ```
+
+Telegram testleri sahte bir Telegram API sunucusuyla çalışır, internet gerekmez.
+Çalışan sunucuyu sahte API'ye yönlendirmek için `CREAMANAGE_TELEGRAM_API=http://…`.
 
 Uçtan uca test gerçek loopback soketleriyle sahte yazıcı kurar; 9999 doluysa
 `CREAMANAGE_TEST_PORT` ile port değiştirilebilir.
@@ -73,6 +93,7 @@ creamanage/
   olaylar.py       durum geçişi → olay; abone modeli (uyarı kanalları buraya takılır)
   filo.py          kayıt + bağlantı + tarama + olay orkestrasyonu, arayüz yayını (≤1/s/yazıcı)
   web.py           aiohttp: statik arayüz, REST API, /ws tarayıcı yayını
+  telegram.py      Telegram bildirim kanalı (OlayMerkezi abonesi, toplu gönderim, 429 uyumu)
 web/               index.html, css/stil.css, js/uygulama.js (bağımlılıksız)
 araclar/sahte_yazici.py   K2 simülatörü
 testler/           birim ve uçtan uca testler
@@ -91,6 +112,9 @@ testler/           birim ve uçtan uca testler
 | `GET /api/aglar` | makinedeki alt ağlar |
 | `POST /api/tarama`, `GET /api/tarama`, `POST /api/tarama/iptal` | tarama işi |
 | `GET /api/olaylar?limit=` | son olaylar |
+| `GET/PUT /api/ayarlar/telegram` | bildirim ayarları (belirteç maskelenir; boş belirteç mevcut olanı korur) |
+| `POST /api/ayarlar/telegram/test` | test mesajı `{token?, sohbetler?}` |
+| `POST /api/ayarlar/telegram/sohbetler` | bota yazan sohbetleri listeler `{token?}` |
 | `WS /ws` | `anlik`, `yazici`, `yazici_silindi`, `olay`, `tarama` mesajları |
 
 ## K2 yerel protokolü (topluluk gözlemi)
@@ -120,9 +144,9 @@ Kamera: K2 ailesi WebRTC (`http://<ip>:8000/call/webrtc_local`); bu sürümde yo
 
 ## Yol haritası
 
-1. **Aktif uyarı sistemi:** `olaylar.OlayMerkezi.abone_ol` üzerinden e-posta / Telegram /
-   web push / sesli uyarı kanalları; kural motoru (örn. "X dk çevrimdışı", "hata", "baskı
-   bitti", "filament bitti"); sessize alma ve vardiya saatleri.
+1. **Uyarı sistemi, devamı:** e-posta / web push / sesli uyarı kanalları
+   (`olaylar.OlayMerkezi.abone_ol` ile eklenir); kural motoru (örn. "X dk çevrimdışı");
+   sessize alma ve vardiya saatleri. Telegram kanalı 0.2.0'da geldi.
 2. Gerçek K2 Plus ile alan/durum doğrulaması, CFS (boxsInfo) kutu-slot görünümü.
 3. Kamera önizlemesi (WebRTC → go2rtc).
 4. Kullanıcı girişi ve yetki (izle / komut ver), HTTPS.

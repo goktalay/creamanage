@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from aiohttp import web  # noqa: E402
 from creamanage.ayarlar import ayarlari_oku  # noqa: E402
 from creamanage.filo import Filo  # noqa: E402
 from creamanage.surum import FIRMA, SURUM, URUN_ADI  # noqa: E402
+from creamanage.telegram import TelegramBildirici  # noqa: E402
 from creamanage.veritabani import Veritabani  # noqa: E402
 from creamanage.web import uygulama_olustur  # noqa: E402
 
@@ -25,8 +27,10 @@ async def calistir(argv: list[str] | None = None) -> None:
     log = logging.getLogger("creamanage")
     vt = Veritabani(ayar.veritabani)
     filo = Filo(vt)
+    telegram = TelegramBildirici(vt, api_taban=os.environ.get("CREAMANAGE_TELEGRAM_API") or "https://api.telegram.org")
+    filo.olaylar.abone_ol(telegram.olay_geldi)
     await filo.baslat()
-    app = uygulama_olustur(filo)
+    app = uygulama_olustur(filo, telegram)
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     site = web.TCPSite(runner, ayar.host, ayar.port)

@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS olaylar (
     veri TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS olaylar_zaman ON olaylar(zaman DESC);
+CREATE TABLE IF NOT EXISTS ayarlar (
+    anahtar TEXT PRIMARY KEY,
+    deger TEXT NOT NULL
+);
 """
 
 
@@ -87,6 +91,24 @@ class Veritabani:
             cur = self._bag.execute("DELETE FROM yazicilar WHERE id=?", (yazici_id,))
             self._bag.commit()
         return cur.rowcount > 0
+
+    # --- ayarlar (JSON değerli anahtar/değer) ---
+    def ayar_oku(self, anahtar: str, varsayilan=None):
+        with self._kilit:
+            s = self._bag.execute("SELECT deger FROM ayarlar WHERE anahtar=?", (anahtar,)).fetchone()
+        if not s:
+            return varsayilan
+        try:
+            return json.loads(s["deger"])
+        except ValueError:
+            return varsayilan
+
+    def ayar_yaz(self, anahtar: str, deger) -> None:
+        with self._kilit:
+            self._bag.execute("INSERT INTO ayarlar(anahtar, deger) VALUES (?,?)"
+                              " ON CONFLICT(anahtar) DO UPDATE SET deger=excluded.deger",
+                              (anahtar, json.dumps(deger, ensure_ascii=False)))
+            self._bag.commit()
 
     # --- olaylar ---
     def olay_ekle(self, tur: str, mesaj: str, yazici_id: int | None = None,

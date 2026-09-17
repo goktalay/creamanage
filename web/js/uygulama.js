@@ -278,6 +278,69 @@
     } catch (e) { bildir(e.message); }
   });
 
+  // ---------- Telegram bildirimleri ----------
+  let tgAyar = null;
+  async function bildirimAc() {
+    ac("ortu-bildirim");
+    try { tgAyar = (await api("/api/ayarlar/telegram")).telegram; tgDoldur(); }
+    catch (e) { bildir(e.message); }
+  }
+  function tgDoldur() {
+    const f = $("#tg-form"), a = tgAyar;
+    f.token.value = "";
+    f.token.placeholder = a.token_var ? `kayıtlı: ${a.token_maske} (değiştirmek için yenisini yazın)` : "123456789:AA…";
+    $("#tg-token-durum").textContent = a.token_var ? "Belirteç kayıtlı." : "Belirteç girilmemiş.";
+    f.sohbetler.value = a.sohbetler.join(", ");
+    f.etkin.checked = a.etkin;
+    $("#tg-olaylar").innerHTML = a.secilebilir.map(o =>
+      `<label><input type="checkbox" name="olay" value="${o.tur}" ${a.olaylar.includes(o.tur) ? "checked" : ""}> ${kacis(o.ad)}</label>`).join("");
+    $("#tg-sohbet-liste").innerHTML = "";
+    tgDurum();
+  }
+  function tgDurum() {
+    const a = tgAyar, d = $("#tg-durum");
+    if (!a) return;
+    if (a.son_hata) { d.textContent = "Son hata: " + a.son_hata; d.className = "ipucu olay-kritik"; }
+    else if (a.son_gonderim) { d.textContent = `Son gönderim ${saat(a.son_gonderim)} · toplam ${a.gonderilen}`; d.className = "ipucu"; }
+    else { d.textContent = a.etkin ? "Henüz gönderim yok." : "Devre dışı."; d.className = "ipucu"; }
+  }
+  function tgForm() {
+    const f = $("#tg-form");
+    return { token: f.token.value.trim(), sohbetler: f.sohbetler.value, etkin: f.etkin.checked,
+             olaylar: $$("#tg-olaylar input:checked").map(i => i.value) };
+  }
+  $("#tg-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try { tgAyar = (await put("/api/ayarlar/telegram", tgForm())).telegram; tgDoldur(); bildir("Bildirim ayarları kaydedildi"); }
+    catch (err) { bildir(err.message); }
+  });
+  $("#tg-test").addEventListener("click", async () => {
+    const v = tgForm(), b = $("#tg-test"); b.disabled = true;
+    try {
+      const r = await post("/api/ayarlar/telegram/test", { token: v.token, sohbetler: v.sohbetler.split(",").map(s => s.trim()).filter(Boolean) });
+      bildir(r.basarili ? "Test mesajı gönderildi, Telegram'ı kontrol edin" : "Gönderilemedi: " + r.hatalar.join("; "), 6000);
+    } catch (err) { bildir(err.message, 6000); }
+    finally { b.disabled = false; }
+  });
+  $("#tg-sohbet-bul").addEventListener("click", async () => {
+    const b = $("#tg-sohbet-bul"); b.disabled = true;
+    try {
+      const r = await post("/api/ayarlar/telegram/sohbetler", { token: tgForm().token });
+      const kap = $("#tg-sohbet-liste");
+      if (!r.sohbetler.length) { kap.innerHTML = `<p class="ipucu">Bot @${kacis(r.bot.kullanici_adi)} bulundu ama henüz mesaj almamış. Telegram'da bota /start yazıp yeniden deneyin.</p>`; return; }
+      kap.innerHTML = `<p class="ipucu">Bot @${kacis(r.bot.kullanici_adi)} · bota yazan sohbetler (eklemek için tıklayın):</p>` +
+        r.sohbetler.map(s => `<label><input type="checkbox" data-id="${kacis(s.id)}"> ${kacis(s.ad)} <small>${kacis(s.tur)} · ${kacis(s.id)}</small></label>`).join("");
+      $$("#tg-sohbet-liste input").forEach(i => i.addEventListener("change", () => {
+        const f = $("#tg-form"), mevcut = f.sohbetler.value.split(",").map(x => x.trim()).filter(Boolean);
+        const id = i.dataset.id, idx = mevcut.indexOf(id);
+        if (i.checked && idx < 0) mevcut.push(id); if (!i.checked && idx >= 0) mevcut.splice(idx, 1);
+        f.sohbetler.value = mevcut.join(", ");
+      }));
+    } catch (err) { bildir(err.message, 6000); }
+    finally { b.disabled = false; }
+  });
+  $("#btn-bildirim").addEventListener("click", bildirimAc);
+
   // ---------- genel ----------
   function ac(id) { $("#" + id).hidden = false; }
   function kapat(id) { $("#" + id).hidden = true; if (id === "ortu-ayrinti") { st.acikYazici = null; $("#ay-form").dataset.id = ""; } }

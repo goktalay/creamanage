@@ -89,6 +89,8 @@ class Filo:
             guncelle["model"] = yeni["model"]
         if yeni.get("hostname") and yeni["hostname"] != kayit.get("hostname"):
             guncelle["hostname"] = yeni["hostname"]
+            if kayit.get("ad") in ("", kayit.get("ip")):
+                guncelle["ad"] = yeni["hostname"]     # elle IP ile eklenene hostname'i ad yap
         if guncelle:
             k = self.vt.yazici_guncelle(yid, **guncelle)
             if k:
