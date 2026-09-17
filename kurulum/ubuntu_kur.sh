@@ -13,10 +13,27 @@ PORT="${CREAMANAGE_PORT:-8090}"
 [ "$(id -u)" -eq 0 ] || { echo "Lütfen sudo ile çalıştırın."; exit 1; }
 [ -f "$KOK/main.py" ] || { echo "main.py bulunamadı: $KOK"; exit 1; }
 
+# Servis kullanıcısı uygulama klasörüne ulaşabilmeli: üst dizinlere yalnız "geçiş" (x) izni.
+erisim_ver() {
+  local d="$1"
+  while [ "$d" != "/" ]; do
+    if ! sudo -u "$KULLANICI" test -x "$d" 2>/dev/null; then
+      if command -v setfacl >/dev/null 2>&1; then setfacl -m "u:$KULLANICI:--x" "$d"; else chmod o+x "$d"; fi
+    fi
+    d="$(dirname "$d")"
+  done
+}
+# Ev dizini altındaysa ProtectHome servisi engeller (203/EXEC): salt okunur erişime çevir.
+servis_yaz() {
+  sed -e "s#/opt/creamanage#$KOK#g" -e "s#/var/lib/creamanage#$VERI#g" "$KOK/kurulum/creamanage.service" > /etc/systemd/system/creamanage.service
+  case "$KOK" in /home/*|/root/*) sed -i "s/^ProtectHome=.*/ProtectHome=read-only/" /etc/systemd/system/creamanage.service ;; esac
+  chmod 644 /etc/systemd/system/creamanage.service
+}
+
 echo "1) Paketler"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq python3 python3-venv python3-pip >/dev/null
+apt-get install -y -qq python3 python3-venv python3-pip acl >/dev/null
 
 echo "2) Servis kullanıcısı ve veri dizini ($VERI)"
 id -u "$KULLANICI" >/dev/null 2>&1 || useradd --system --home "$VERI" --shell /usr/sbin/nologin "$KULLANICI"
@@ -31,6 +48,7 @@ echo "3) Python sanal ortamı ($KOK/venv)"
 # Servis kullanıcısı uygulama dosyalarını okuyabilmeli (yazmaz)
 chmod -R a+rX "$KOK"
 find "$KOK" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
+erisim_ver "$KOK"
 
 echo "4) Ayar dosyası ($AYAR/creamanage.env)"
 if [ ! -f "$AYAR/creamanage.env" ]; then
@@ -43,9 +61,7 @@ else
 fi
 
 echo "5) systemd servisi (WorkingDirectory=$KOK)"
-sed -e "s#/opt/creamanage#$KOK#g" -e "s#/var/lib/creamanage#$VERI#g" \
-    "$KOK/kurulum/creamanage.service" > /etc/systemd/system/creamanage.service
-chmod 644 /etc/systemd/system/creamanage.service
+servis_yaz
 systemctl daemon-reload
 systemctl enable creamanage >/dev/null
 systemctl restart creamanage
