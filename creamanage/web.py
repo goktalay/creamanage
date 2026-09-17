@@ -18,6 +18,7 @@ from .kullanicilar import CEREZ_ADI, OTURUM_EN_FAZLA_SN, ROL_ADLARI, KullaniciYo
 from .telegram import TelegramBildirici
 from . import yukleme as Y
 from . import hata_kodlari as HK
+from . import kamera as KAM
 from .olaylar import yonetici_mi_gorur
 from .surum import FIRMA, SURUM, URUN_ADI, URUN_KODU
 
@@ -66,7 +67,7 @@ def gerekli_rol(yontem: str, yol: str) -> str:
     if yontem != "GET" and (yol in ("/api/yazicilar", "/api/yazicilar/toplu") or yol.startswith("/api/tarama")
                             or (yontem in ("PUT", "DELETE") and yol.startswith("/api/yazicilar/"))):
         return "sistem_yoneticisi"          # yazıcı ekleme/silme/ayar/tarama yalnız sistem yöneticisi
-    if yol in ("/api/cikis", "/api/ben", "/api/ben/parola", "/api/ben/tercihler"):
+    if yol in ("/api/cikis", "/api/ben", "/api/ben/parola", "/api/ben/tercihler") or yol.endswith("/kamera/kayit"):
         return "gozetmen"
     if yontem in ("POST", "PUT", "DELETE", "PATCH"):
         return "yazici_yoneticisi"
@@ -314,9 +315,9 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
         yid = int(istek.match_info["id"])
         v = await _govde(istek)
         alanlar = {}
-        for k in ("ad", "grup", "notlar", "model"):
+        for k in ("ad", "grup", "notlar", "model", "kamera_url"):
             if k in v:
-                alanlar[k] = str(v[k])
+                alanlar[k] = str(v[k]).strip()
         if "ip" in v:
             ip = _ip_dogrula(str(v["ip"]))
             if any(k["ip"] == ip and k["id"] != yid for k in filo.kayitlar.values()):
@@ -396,6 +397,34 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
                 h["aciklama"] = HK.acikla(h.get("yeni"), h.get("baglam"))
         olaylar = [o for o in filo.vt.olaylar(300, yid) if o["tur"] in ("hata", "hata_gecti", "filament_yok", "koptu", "dis_mudahale")]
         return _json({"hatalar": hatalar, "olaylar": _olay_suz(olaylar, istek)})
+
+    async def kamera_goruntu(istek):
+        """kamera_url tanımlıysa sunucu tek kare çeker; değilse 404 + tarayıcı WebRTC bilgisi."""
+        yid = int(istek.match_info["id"])
+        kayit = filo.kayitlar.get(yid)
+        if kayit is None:
+            return _hata("yazıcı bulunamadı", 404)
+        url = (kayit.get("kamera_url") or "").strip()
+        if not url:
+            return _json({"hata": "sunucu tarafı kamera URL'si tanımlı değil; tarayıcı WebRTC yolu kullanılır",
+                          "webrtc": f"http://{kayit['ip']}:8000/call/webrtc_local", "ip": kayit["ip"]}, 404)
+        try:
+            veri, tur = await KAM.goruntu_al(url)
+        except Exception as e:  # noqa: BLE001
+            _denetim(istek, "kamera_goruntu_hatasi", _yazici_etiketi(yid), f"{url}: {e}")
+            return _hata(f"kamera görüntüsü alınamadı: {e}", 502)
+        _denetim(istek, "kamera_goruntu", _yazici_etiketi(yid), f"sunucu ({len(veri) // 1024} KB)")
+        return web.Response(body=veri, content_type=tur, headers={"Cache-Control": "no-store"})
+
+    async def kamera_kayit(istek):
+        """Tarayıcının doğrudan WebRTC ile aldığı kare için işlem geçmişi kaydı."""
+        yid = int(istek.match_info["id"])
+        if yid not in filo.kayitlar:
+            return _hata("yazıcı bulunamadı", 404)
+        v = await _govde(istek)
+        _denetim(istek, "kamera_goruntu" if v.get("basarili", True) else "kamera_goruntu_hatasi", _yazici_etiketi(yid),
+                 "tarayıcı WebRTC" + (f": {str(v.get('hata', ''))[:200]}" if v.get("hata") else ""))
+        return _json({"kaydedildi": True})
 
     async def dosya_yukle(istek):
         """multipart: file (zorunlu), baslat (1/0, varsayılan 1). Yükler ve baskıyı başlatır."""
@@ -629,6 +658,8 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
     app.router.add_delete(r"/api/yazicilar/{id:\d+}", yazici_sil)
     app.router.add_post(r"/api/yazicilar/{id:\d+}/komut", komut)
     app.router.add_post(r"/api/yazicilar/{id:\d+}/dosya", dosya_yukle)
+    app.router.add_get(r"/api/yazicilar/{id:\d+}/kamera", kamera_goruntu)
+    app.router.add_post(r"/api/yazicilar/{id:\d+}/kamera/kayit", kamera_kayit)
     app.router.add_get(r"/api/yazicilar/{id:\d+}/telemetri", telemetri_ornekler)
     app.router.add_get(r"/api/yazicilar/{id:\d+}/degisimler", telemetri_degisimler)
     app.router.add_get(r"/api/yazicilar/{id:\d+}/hatalar", telemetri_hatalar)

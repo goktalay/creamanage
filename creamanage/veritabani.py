@@ -80,7 +80,8 @@ class Veritabani:
         """Eski veritabanlarına yeni sütunları ekler (kilit alınmış halde çağrılır)."""
         mevcut = {s[1] for s in self._bag.execute("PRAGMA table_info(yazicilar)").fetchall()}
         for sutun, tanim in (("http_port", "INTEGER NOT NULL DEFAULT 80"),
-                             ("gcode_dizini", "TEXT NOT NULL DEFAULT ''")):
+                             ("gcode_dizini", "TEXT NOT NULL DEFAULT ''"),
+                             ("kamera_url", "TEXT NOT NULL DEFAULT ''")):
             if sutun not in mevcut:
                 self._bag.execute(f"ALTER TABLE yazicilar ADD COLUMN {sutun} {tanim}")
         mevcut_k = {s[1] for s in self._bag.execute("PRAGMA table_info(kullanicilar)").fetchall()}
@@ -117,7 +118,7 @@ class Veritabani:
         return kayit
 
     def yazici_guncelle(self, yazici_id: int, **alanlar) -> dict | None:
-        izinli = {"ad", "ip", "port", "model", "hostname", "grup", "notlar", "etkin", "http_port", "gcode_dizini"}
+        izinli = {"ad", "ip", "port", "model", "hostname", "grup", "notlar", "etkin", "http_port", "gcode_dizini", "kamera_url"}
         alanlar = {k: v for k, v in alanlar.items() if k in izinli}
         if alanlar:
             sql = ", ".join(f"{k}=?" for k in alanlar)

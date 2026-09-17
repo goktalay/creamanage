@@ -50,6 +50,8 @@ class SahteYazici:
         app.router.add_get("/", self._ws)
         app.router.add_get("/info", self._info)
         app.router.add_post("/upload/{ad}", self._upload)
+        app.router.add_get("/snapshot", self._snapshot)
+        app.router.add_get("/stream", self._stream)
         self._runner = web.AppRunner(app, access_log=None)
         await self._runner.setup()
         await web.TCPSite(self._runner, self.ip, self.port).start()
@@ -70,6 +72,36 @@ class SahteYazici:
 
     async def _info(self, _):
         return web.json_response({"model": "F008", "hostname": self.hostname, "modelVersion": "V1.2.3.4"})
+
+    def _png(self) -> bytes:
+        """Bağımlılıksız 160x100 PNG: baskı ilerlemesine göre yeşil şerit (görsel test için)."""
+        import struct, zlib
+        w, h = 160, 100
+        yuzde = int(self.durum.get("printProgress") or 0)
+        satirlar = b""
+        for y in range(h):
+            satir = bytearray(b"\x00")
+            for x in range(w):
+                if 80 <= y < 92 and x < w * yuzde // 100:
+                    satir += b"\x1f\x8a\x4c"
+                elif (x // 20 + y // 20) % 2 == 0:
+                    satir += b"\x2b\x36\x44"
+                else:
+                    satir += b"\x1b\x23\x2e"
+            satirlar += bytes(satir)
+        def parca(tur, veri):
+            return struct.pack(">I", len(veri)) + tur + veri + struct.pack(">I", zlib.crc32(tur + veri) & 0xffffffff)
+        return (b"\x89PNG\r\n\x1a\n" + parca(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0))
+                + parca(b"IDAT", zlib.compress(satirlar, 6)) + parca(b"IEND", b""))
+
+    async def _snapshot(self, _):
+        return web.Response(body=self._png(), content_type="image/png")
+
+    async def _stream(self, _):
+        """MJPEG akış taklidi: tek JPEG çerçevesi (geçerli SOI/EOI ile küçük bir JPEG)."""
+        jpeg = bytes.fromhex("ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c2837292c30313434341f27393d38323c2e333432ffc0000b080001000101011100ffc4001f0000010501010101010100000000000000000102030405060708090a0bffc400b5100002010303020403050504040000017d01020300041105122131410613516107227114328191a1082342b1c11552d1f02433627282090a161718191a25262728292a3435363738393a434445464748494a535455565758595a636465666768696a737475767778797a838485868788898a92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9cad2d3d4d5d6d7d8d9dae1e2e3e4e5e6e7e8e9eaf1f2f3f4f5f6f7f8f9faffda0008010100003f00fbd0ffd9")
+        govde = b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n--frame\r\n"
+        return web.Response(body=govde, headers={"Content-Type": "multipart/x-mixed-replace; boundary=frame"})
 
     async def _upload(self, istek: web.Request):
         ad = istek.match_info["ad"]

@@ -6,7 +6,7 @@ Creality **K2 Plus (Combo)** 3D yazıcı filosunu (hedef: 56 cihaz) yerel ağ ü
 Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sunduğu
 **WebSocket 9999** arayüzü kullanılır (root, Moonraker, bulut yok). Garanti korunur.
 
-## Sürüm 0.7.0 — ne yapar
+## Sürüm 0.8.0 — ne yapar
 
 - **Kullanıcı girişi ve roller:** herkes kullanıcı adı ve parola ile girer. Üç rol:
   **Sistem Yöneticisi** (her şey: yazıcı ekleme/silme/ayarları, ağ tarama, kullanıcılar,
@@ -45,6 +45,13 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
 - **Sistem dışı müdahale = MAJÖR olay:** baskı, CreaManage üzerinden komut verilmeden
   (yazıcı ekranından) durdurulur ya da iptal edilirse `dis_mudahale` olayı üretilir; yalnız
   sistem yöneticileri görür ve Telegram'da yalnız "yönetici kanalı" sohbetlerine gider.
+- **Kamera modülü:** ayrıntı penceresinde "Görüntü Al" / "Yenile" ile yazıcı kamerasından
+  tek kare. K2 ailesinde stok yazılım JPEG ucu sunmadığı için kare, tarayıcıdan yazıcının
+  `:8000/call/webrtc_local` ucuna WebRTC ile bağlanılarak alınır (bilgisayar yazıcıyla aynı
+  ağda olmalı, sayfa HTTP ile açılmalı). İsteğe bağlı sunucu taraflı kaynak: Yazıcı
+  Ayarları'nda "Kamera görüntü URL'si" (go2rtc `api/frame.jpeg` ya da K1 MJPEG
+  `?action=snapshot`/`stream`); tanımlıysa görüntü sunucudan gelir, uzaktan da çalışır.
+  Her görüntü alma işlem geçmişine yazılır. PNG indirilebilir.
 - **Geçmiş grafikleri:** ayrıntı penceresinde sıcaklık (nozul, tabla, kabin ve hedefleri) ve
   ilerleme grafikleri; ayrı eksenli iki grafik, kesişim çizgili ipucu, klavye ile gezinme,
   açık/koyu tema için doğrulanmış renkler; altındaki tablo ve CSV aynı veriyi verir.
@@ -137,7 +144,7 @@ Simülatör telemetri, kalp atışı ve `pause/stop/lightSw` komutlarını takli
 
 ```bash
 cd testler
-python3 -m unittest -v test_telemetri test_mudahale test_yukleme test_kullanicilar test_k2_protokol test_filo_uctan_uca test_telegram
+python3 -m unittest -v test_kamera test_telemetri test_mudahale test_yukleme test_kullanicilar test_k2_protokol test_filo_uctan_uca test_telegram
 ```
 
 Telegram testleri sahte bir Telegram API sunucusuyla çalışır, internet gerekmez.
@@ -186,6 +193,7 @@ testler/           birim ve uçtan uca testler
 | `GET /api/yazicilar/{id}/telemetri?baslangic=&bitis=&adim=&limit=` | telemetri örnekleri (adim: seyreltme sn) |
 | `GET /api/yazicilar/{id}/degisimler`, `GET /api/yazicilar/{id}/hatalar` | değişim ve hata geçmişi |
 | `GET /api/hata_kodlari`, `PUT/DELETE /api/hata_kodlari/{kod}`, `POST /api/hata_kodlari/ice_aktar` | hata kodu tablosu (yazma: sistem yöneticisi) |
+| `GET /api/yazicilar/{id}/kamera`, `POST /api/yazicilar/{id}/kamera/kayit` | sunucu taraflı kare (kamera_url) / tarayıcı WebRTC işlem kaydı |
 | `POST /api/yazicilar/{id}/dosya` | multipart `file` (+`baslat`=1/0): yükle ve yazdır (yazıcı yöneticisi) |
 | `POST /api/yazicilar/{id}/komut` | `{komut: duraklat\|surdur\|durdur\|isik\|nozul\|tabla\|fan, deger?}` |
 | `GET /api/aglar` | makinedeki alt ağlar |
@@ -227,7 +235,9 @@ başlar. `GET http://<ip>/info` model kodunu verir (F008 = K2 Plus). CFS çok re
 için Creality Print `colorMatch` + `multiColorPrint` mesajlarını kullanır; bu sürümde
 G-code yazıcıya sliced haliyle gönderilir, slot eşlemesi ileride eklenecek.
 
-Kamera: K2 ailesi WebRTC (`http://<ip>:8000/call/webrtc_local`); bu sürümde yok.
+Kamera: K2 ailesi WebRTC — `POST http://<ip>:8000/call/webrtc_local`, gövde
+`base64(JSON{type:"offer", sdp})`, yanıt `base64(JSON{type:"answer", sdp})`, `Content-Type:
+plain/text`. Sürekli izleme için go2rtc: `webrtc:http://<ip>:8000/call/webrtc_local#format=creality`.
 
 ## Yol haritası
 
@@ -235,7 +245,7 @@ Kamera: K2 ailesi WebRTC (`http://<ip>:8000/call/webrtc_local`); bu sürümde yo
    (`olaylar.OlayMerkezi.abone_ol` ile eklenir); kural motoru (örn. "X dk çevrimdışı");
    sessize alma ve vardiya saatleri. Telegram kanalı 0.2.0'da geldi.
 2. Gerçek K2 Plus ile alan/durum doğrulaması, CFS (boxsInfo) kutu-slot görünümü.
-3. Kamera önizlemesi (WebRTC → go2rtc).
+3. Canlı kamera akışı (go2rtc ile).
 4. HTTPS (ters vekil), oturum listesi ve uzaktan kapatma.
 5. CFS slot eşlemesi (colorMatch), iş kuyruğu, toplu yükleme (aynı dosyayı N yazıcıya).
 6. Geçmiş raporları: yazıcı kullanım oranı, baskı süreleri, hata sıklığı.

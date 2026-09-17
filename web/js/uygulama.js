@@ -282,7 +282,7 @@
 
   // ---------- ayrıntı ----------
   // ---------- yazıcı ayrıntısı: modüller ----------
-  const AY_MODULLER = { durum: "Durum Bilgisi", islemler: "İşlemler", hatalar: "Yazıcı Hataları", gecmis: "Geçmiş", ayarlar: "Yazıcı Ayarları" };
+  const AY_MODULLER = { durum: "Durum Bilgisi", islemler: "İşlemler", hatalar: "Yazıcı Hataları", gecmis: "Geçmiş", kamera: "Kamera", ayarlar: "Yazıcı Ayarları" };
   let ayModul = "durum";
   function ayMenuKapat() { $("#ay-menu").hidden = true; $("#ay-menu-btn").classList.remove("acik"); }
   function ayModulAc(ad) {
@@ -294,6 +294,7 @@
     const y = st.yazicilar.get(st.acikYazici); if (!y) return;
     if (ad === "hatalar") ayHatalarYukle(y.id);
     if (ad === "gecmis") ayGecmisYukle(y.id);
+    if (ad === "kamera") kameraHazirla(y.id);
   }
   $("#ay-menu-btn").addEventListener("click", (e) => { e.stopPropagation(); const m = $("#ay-menu"), acik = m.hidden; ayMenuKapat(); m.hidden = !acik; $("#ay-menu-btn").classList.toggle("acik", acik); });
   $$(".uyg[data-ay-modul]").forEach(b => b.addEventListener("click", () => ayModulAc(b.dataset.ayModul)));
@@ -446,6 +447,85 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `${y.ad}_telemetri.csv`; a.click(); URL.revokeObjectURL(a.href);
   });
   $("#ay-dosya-btn").addEventListener("click", () => { yukleHedef = st.acikYazici; $("#dosya-secici").value = ""; $("#dosya-secici").click(); });
+
+  // ---------- kamera: sunucu URL'si ya da tarayıcıdan doğrudan WebRTC (K2 webrtc_local) ----------
+  let kameraSonId = null, kameraSonPng = null;
+  function kameraHazirla(id) {
+    if (kameraSonId !== id) { kameraSonId = id; kameraSonPng = null; $("#kamera-goruntu").innerHTML = '<p class="ipucu" id="kamera-metin">Görüntü almak için düğmeye basın.</p>'; $("#kamera-yenile").disabled = true; $("#kamera-indir").disabled = true; $("#kamera-durum").textContent = ""; }
+  }
+  function kameraGoster(kaynak, aciklama) {
+    const kap = $("#kamera-goruntu"); kap.innerHTML = "";
+    const img = document.createElement("img"); img.src = kaynak; img.alt = "Yazıcı kamerası"; kap.appendChild(img);
+    const z = document.createElement("span"); z.className = "kamera-zaman"; z.textContent = new Date().toLocaleString("tr-TR") + (aciklama ? " · " + aciklama : ""); kap.appendChild(z);
+    kameraSonPng = kaynak; $("#kamera-yenile").disabled = false; $("#kamera-indir").disabled = false;
+  }
+  function webrtcTekKare(ip, zamanAsimiMs) {
+    return new Promise((coz, reddet) => {
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      const video = document.createElement("video"); video.muted = true; video.playsInline = true; video.autoplay = true;
+      let bitti = false;
+      const temizle = () => { try { pc.close(); } catch (e) { /* yok say */ } try { video.srcObject = null; } catch (e) { /* yok say */ } };
+      const zamanlayici = setTimeout(() => { if (!bitti) { bitti = true; temizle(); reddet(new Error("zaman aşımı: yazıcıya ulaşılamadı ya da video gelmedi (bilgisayar yazıcıyla aynı ağda mı?)")); } }, zamanAsimiMs);
+      const yakala = () => {
+        if (bitti) return;
+        if (!video.videoWidth) { setTimeout(yakala, 150); return; }
+        const c = document.createElement("canvas"); c.width = video.videoWidth; c.height = video.videoHeight;
+        c.getContext("2d").drawImage(video, 0, 0);
+        bitti = true; clearTimeout(zamanlayici); temizle();
+        coz({ png: c.toDataURL("image/png"), boyut: `${c.width}×${c.height}` });
+      };
+      pc.ontrack = (ev) => {
+        video.srcObject = ev.streams[0];
+        video.play().catch(() => {});
+        if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => video.requestVideoFrameCallback(yakala));   // ikinci kare: tam çözülmüş
+        else video.addEventListener("loadeddata", () => setTimeout(yakala, 400), { once: true });
+      };
+      pc.addTransceiver("video", { direction: "sendrecv" });
+      const gonder = async () => {
+        try {
+          const r = await fetch(`http://${ip}:8000/call/webrtc_local`, { method: "POST", headers: { "Content-Type": "plain/text" }, body: btoa(JSON.stringify({ type: "offer", sdp: pc.localDescription.sdp })) });
+          if (!r.ok) throw new Error("kamera servisi HTTP " + r.status);
+          const yanit = JSON.parse(atob(await r.text()));
+          if (yanit.type !== "answer") throw new Error("beklenmeyen yanıt");
+          await pc.setRemoteDescription(new RTCSessionDescription(yanit));
+        } catch (e) {
+          const m = /Failed to fetch|NetworkError|Load failed/i.test(String(e.message)) ? `yazıcının kamera servisine (http://${ip}:8000) tarayıcıdan ulaşılamadı; bilgisayarınız yazıcıyla aynı ağda mı, yazıcı açık mı?` : e.message;
+          if (!bitti) { bitti = true; clearTimeout(zamanlayici); temizle(); reddet(new Error(m)); }
+        }
+      };
+      let gonderildi = false;
+      const tamamla = () => { if (!gonderildi) { gonderildi = true; gonder(); } };
+      pc.onicecandidate = (ev) => { if (ev.candidate === null) tamamla(); };
+      pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === "complete") tamamla(); };
+      pc.createOffer().then(d => pc.setLocalDescription(d)).then(() => setTimeout(tamamla, 1500)).catch(e => { if (!bitti) { bitti = true; clearTimeout(zamanlayici); temizle(); reddet(e); } });
+    });
+  }
+  async function kameraGoruntuAl() {
+    const id = st.acikYazici, y = st.yazicilar.get(id); if (!y) return;
+    const kap = $("#kamera-goruntu"), durum = $("#kamera-durum");
+    $("#kamera-al").disabled = true; $("#kamera-yenile").disabled = true; kap.classList.add("aliniyor"); durum.textContent = "";
+    try {
+      const r = await fetch(`/api/yazicilar/${id}/kamera`, { cache: "no-store" });
+      if (r.ok) {
+        const blob = await r.blob(); kameraGoster(URL.createObjectURL(blob), "sunucu"); durum.textContent = "Sunucu kaynağından alındı.";
+      } else if (r.status === 404) {
+        const v = await r.json();
+        if (!v.ip) throw new Error(v.hata || "yazıcı bulunamadı");
+        if (location.protocol === "https:") throw new Error("Bu sayfa HTTPS ile açılmış; tarayıcı yazıcıya HTTP ile bağlanamaz. Sunucu taraflı kamera URL'si tanımlayın.");
+        durum.textContent = "Yazıcıya WebRTC ile bağlanılıyor…";
+        const s = await webrtcTekKare(v.ip, 15000);
+        kameraGoster(s.png, "WebRTC " + s.boyut); durum.textContent = "Yazıcı kamerasından alındı.";
+        post(`/api/yazicilar/${id}/kamera/kayit`, { basarili: true }).catch(() => {});
+      } else { const v = await r.json().catch(() => ({})); throw new Error(v.hata || r.statusText); }
+    } catch (e) {
+      durum.textContent = "Görüntü alınamadı: " + e.message;
+      if (!kameraSonPng) kap.innerHTML = `<p class="ipucu">Görüntü alınamadı.<br>${kacis(e.message)}</p>`;
+      post(`/api/yazicilar/${id}/kamera/kayit`, { basarili: false, hata: e.message }).catch(() => {});
+    } finally { kap.classList.remove("aliniyor"); $("#kamera-al").disabled = false; $("#kamera-yenile").disabled = !kameraSonPng; }
+  }
+  $("#kamera-al").addEventListener("click", kameraGoruntuAl);
+  $("#kamera-yenile").addEventListener("click", kameraGoruntuAl);
+  $("#kamera-indir").addEventListener("click", () => { if (!kameraSonPng) return; const y = st.yazicilar.get(st.acikYazici); const a = document.createElement("a"); a.href = kameraSonPng; a.download = `${(y && y.ad) || "yazici"}_kamera_${new Date().toISOString().replace(/[:.]/g, "-")}.png`; a.click(); });
   const IK = (yol) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${yol}</svg>`;
   const IKON = {
     printer: IK('<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M6 15h12v6H6z"/><circle cx="17.5" cy="12.5" r=".8" fill="currentColor"/>'),
@@ -471,6 +551,8 @@
     play: IK('<path d="M6 4v16l14-8-14-8z"/>'),
     x: IK('<path d="M6 6l12 12M18 6 6 18"/>'),
     tag: IK('<path d="M3 12V4h8l10 10-8 8L3 12z"/><circle cx="7.5" cy="8.5" r="1.2" fill="currentColor"/>'),
+    camera: IK('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
+    refresh: IK('<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>'),
   };
   $$(".ki[data-ikon]").forEach(el => { el.innerHTML = IKON[el.dataset.ikon] || ""; });
   function bilgiKart(ikon, etiket, deger, secenek) {
@@ -522,7 +604,7 @@
     });
     const f = $("#ay-form");
     if (!f.dataset.id || Number(f.dataset.id) !== y.id) {
-      f.dataset.id = y.id; f.ad.value = y.ad; f.ip.value = y.ip; f.port.value = y.port; f.http_port.value = y.http_port || 80;
+      f.dataset.id = y.id; f.ad.value = y.ad; f.ip.value = y.ip; f.port.value = y.port; f.http_port.value = y.http_port || 80; f.kamera_url.value = y.kamera_url || "";
       f.grup.value = y.grup || ""; f.notlar.value = y.notlar || ""; f.etkin.checked = !!y.etkin;
     }
   }
@@ -530,7 +612,7 @@
     e.preventDefault();
     const f = e.target, id = Number(f.dataset.id);
     try {
-      await put(`/api/yazicilar/${id}`, { ad: f.ad.value, ip: f.ip.value, port: Number(f.port.value) || 9999, http_port: Number(f.http_port.value) || 80, grup: f.grup.value, notlar: f.notlar.value, etkin: f.etkin.checked });
+      await put(`/api/yazicilar/${id}`, { ad: f.ad.value, ip: f.ip.value, port: Number(f.port.value) || 9999, http_port: Number(f.http_port.value) || 80, grup: f.grup.value, notlar: f.notlar.value, kamera_url: f.kamera_url.value.trim(), etkin: f.etkin.checked });
       bildir("Kaydedildi");
     } catch (err) { bildir(err.message); }
   });
@@ -744,7 +826,7 @@
     yazici_ekledi: "Yazıcı ekledi", yazici_guncelledi: "Yazıcı güncelledi", yazici_sildi: "Yazıcı sildi", tarama_baslatti: "Ağ taraması başlattı",
     bildirim_ayarladi: "Bildirim ayarı değiştirdi", bildirim_test: "Bildirim testi gönderdi", tarama_iptal: "Ağ taramasını iptal etti", komut_duraklat: "Baskıyı durdurdu (duraklattı)", komut_surdur: "Baskıyı başlattı (sürdürdü)",
     komut_durdur: "Baskıyı iptal etti", komut_isik: "Işığı değiştirdi", komut_nozul: "Nozul sıcaklığı ayarladı", komut_tabla: "Tabla sıcaklığı ayarladı",
-    komut_fan: "Fan ayarladı", dosya_yukledi: "Dosya yükledi ve yazdırdı", dosya_yukleme_hatasi: "Dosya yükleme HATASI", hata_kodu_kaydetti: "Hata kodu ekledi/güncelledi", hata_kodu_sildi: "Hata kodu sildi", hata_kodu_ice_aktardi: "Hata kodu tablosu içe aktardı" };
+    komut_fan: "Fan ayarladı", dosya_yukledi: "Dosya yükledi ve yazdırdı", dosya_yukleme_hatasi: "Dosya yükleme HATASI", hata_kodu_kaydetti: "Hata kodu ekledi/güncelledi", hata_kodu_sildi: "Hata kodu sildi", hata_kodu_ice_aktardi: "Hata kodu tablosu içe aktardı", kamera_goruntu: "Kamera görüntüsü aldı", kamera_goruntu_hatasi: "Kamera görüntüsü alınamadı" };
   async function gecmisAc(id) {
     try {
       const v = await api(id == null ? "/api/kullanicilar/gecmis?limit=1000" : `/api/kullanicilar/${id}/gecmis`);

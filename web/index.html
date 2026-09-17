@@ -193,6 +193,7 @@
           <button class="uyg" data-ay-modul="islemler" data-rol="yazici_yoneticisi"><span class="uyg-ikon">🎛️</span>İşlemler</button>
           <button class="uyg" data-ay-modul="hatalar"><span class="uyg-ikon">⚠️</span>Yazıcı Hataları</button>
           <button class="uyg" data-ay-modul="gecmis"><span class="uyg-ikon">🕘</span>Geçmiş</button>
+          <button class="uyg" data-ay-modul="kamera"><span class="uyg-ikon">📷</span>Kamera</button>
           <button class="uyg" data-ay-modul="ayarlar" data-rol="sistem_yoneticisi"><span class="uyg-ikon">⚙️</span>Yazıcı Ayarları</button>
         </div>
         <button class="btn btn-ikincil" data-kapat="ortu-ayrinti">Kapat</button>
@@ -275,6 +276,19 @@
         <ul id="ay-olaylar" class="kucuk"></ul>
       </section>
 
+      <section class="ay-modul" id="ay-modul-kamera" hidden>
+        <div class="kamera-kutu">
+          <div class="kamera-goruntu" id="kamera-goruntu"><p class="ipucu" id="kamera-metin">Görüntü almak için düğmeye basın.</p></div>
+          <div class="satir kamera-arac">
+            <button class="btn komut btn-birincil" id="kamera-al"><span class="ki" data-ikon="camera"></span>Görüntü Al</button>
+            <button class="btn komut" id="kamera-yenile" disabled><span class="ki" data-ikon="refresh"></span>Yenile</button>
+            <button class="btn" id="kamera-indir" disabled>PNG indir</button>
+            <span class="ipucu" id="kamera-durum"></span>
+          </div>
+          <p class="ipucu">K2 ailesinde görüntü, tarayıcınızdan yazıcının kamerasına doğrudan WebRTC ile bağlanılarak alınır; bu yüzden bilgisayarınızın yazıcıyla aynı ağda olması gerekir. Sunucu taraflı bir görüntü kaynağı (go2rtc ya da MJPEG) tanımlıysa görüntü sunucudan gelir.</p>
+        </div>
+      </section>
+
       <section class="ay-modul dar" id="ay-modul-ayarlar" hidden>
         <div class="panel">
           <form class="form" id="ay-form">
@@ -286,6 +300,7 @@
             </div>
             <label>Grup <input name="grup" placeholder="örn. Hat-1"></label>
             <label>Notlar <input name="notlar"></label>
+            <label>Kamera görüntü URL'si (isteğe bağlı, sunucu tarafı) <input name="kamera_url" placeholder="örn. http://go2rtc:1984/api/frame.jpeg?src=yazici12  ya da  http://IP:8080/?action=snapshot"></label>
             <label class="satir"><input name="etkin" type="checkbox"> Bağlantı etkin</label>
             <div class="alanlar-kucuk ipucu" id="ay-teknik"></div>
             <div class="satir">
