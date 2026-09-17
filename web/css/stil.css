@@ -144,3 +144,19 @@ progress#tarama-cubuk { width: 100%; height: 12px; }
 .gecmis tr.kritik td.eylem { color: var(--tehlike); }
 #gecmis-tablo { max-height: 70vh; display: block; overflow: auto; }
 .komutlar .btn { padding: 8px 14px; }
+
+/* --- yükle görünümü --- */
+.yukle-kartlar { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.ykart { border: 1px solid var(--kenar); border-top: 4px solid var(--renk, var(--d-cevrimdisi)); border-radius: 8px; background: var(--panel); display: flex; flex-direction: column; min-height: 170px; }
+.ykart .bas { padding: 8px 10px; font-weight: 600; display: flex; justify-content: space-between; gap: 6px; border-bottom: 1px solid var(--kenar); }
+.ykart .bas .durum { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--renk); white-space: nowrap; }
+.ykart .orta { flex: 1; display: grid; place-items: center; padding: 12px 10px; }
+.ykart .dosya-btn { width: 100%; min-height: 64px; border: 1px dashed var(--kenar); border-radius: 8px; background: var(--arka); font-size: 15px; font-weight: 600; padding: 10px; cursor: pointer; word-break: break-word; text-align: center; color: var(--metin); }
+.ykart .dosya-btn:hover:not(:disabled) { border-color: var(--birincil); color: var(--birincil); }
+.ykart .dosya-btn:disabled { cursor: default; opacity: .7; }
+.ykart .dosya-btn small { display: block; font-weight: 400; font-size: 11px; color: var(--soluk); margin-top: 4px; }
+.ykart .dosya-btn.bos { font-weight: 400; color: var(--soluk); }
+.ykart .dosya-metin { font-size: 15px; font-weight: 600; text-align: center; word-break: break-word; }
+.ykart .alt { padding: 6px 10px; border-top: 1px solid var(--kenar); font-size: 12px; color: var(--soluk); display: flex; justify-content: space-between; }
+.ykart.cevrimdisi { opacity: .65; }
+.ykart progress { width: 100%; height: 6px; margin-top: 6px; accent-color: var(--birincil); }

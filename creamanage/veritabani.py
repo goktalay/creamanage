@@ -74,6 +74,16 @@ class Veritabani:
         with self._kilit:
             self._bag.executescript(SEMA)
             self._bag.commit()
+            self._goc()
+
+    def _goc(self) -> None:
+        """Eski veritabanlarına yeni sütunları ekler (kilit alınmış halde çağrılır)."""
+        mevcut = {s[1] for s in self._bag.execute("PRAGMA table_info(yazicilar)").fetchall()}
+        for sutun, tanim in (("http_port", "INTEGER NOT NULL DEFAULT 80"),
+                             ("gcode_dizini", "TEXT NOT NULL DEFAULT ''")):
+            if sutun not in mevcut:
+                self._bag.execute(f"ALTER TABLE yazicilar ADD COLUMN {sutun} {tanim}")
+        self._bag.commit()
 
     def kapat(self) -> None:
         with self._kilit:
@@ -91,12 +101,12 @@ class Veritabani:
         return dict(s) if s else None
 
     def yazici_ekle(self, ad: str, ip: str, port: int = 9999, model: str = "",
-                    hostname: str = "", grup: str = "", notlar: str = "") -> dict:
+                    hostname: str = "", grup: str = "", notlar: str = "", http_port: int = 80) -> dict:
         with self._kilit:
             cur = self._bag.execute(
-                "INSERT INTO yazicilar(ad, ip, port, model, hostname, grup, notlar, eklenme)"
-                " VALUES (?,?,?,?,?,?,?,?)",
-                (ad.strip(), ip.strip(), int(port), model, hostname, grup, notlar, time.time()))
+                "INSERT INTO yazicilar(ad, ip, port, model, hostname, grup, notlar, eklenme, http_port)"
+                " VALUES (?,?,?,?,?,?,?,?,?)",
+                (ad.strip(), ip.strip(), int(port), model, hostname, grup, notlar, time.time(), int(http_port)))
             self._bag.commit()
             yeni_id = cur.lastrowid
         kayit = self.yazici(int(yeni_id))
@@ -104,7 +114,7 @@ class Veritabani:
         return kayit
 
     def yazici_guncelle(self, yazici_id: int, **alanlar) -> dict | None:
-        izinli = {"ad", "ip", "port", "model", "hostname", "grup", "notlar", "etkin"}
+        izinli = {"ad", "ip", "port", "model", "hostname", "grup", "notlar", "etkin", "http_port", "gcode_dizini"}
         alanlar = {k: v for k, v in alanlar.items() if k in izinli}
         if alanlar:
             sql = ", ".join(f"{k}=?" for k in alanlar)

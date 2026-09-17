@@ -25,6 +25,8 @@ O_HATA_GECTI = "hata_gecti"
 O_FILAMENT_YOK = "filament_yok"
 O_YAZICI_EKLENDI = "yazici_eklendi"
 O_YAZICI_SILINDI = "yazici_silindi"
+O_DOSYA_YUKLENDI = "dosya_yuklendi"
+O_BASKI_BASLATILDI = "baski_baslatildi"
 
 SEVIYE = {
     O_KOPTU: "uyari", O_HATA: "kritik", O_FILAMENT_YOK: "uyari",

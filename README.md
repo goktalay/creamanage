@@ -6,16 +6,22 @@ Creality **K2 Plus (Combo)** 3D yazıcı filosunu (hedef: 56 cihaz) yerel ağ ü
 Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sunduğu
 **WebSocket 9999** arayüzü kullanılır (root, Moonraker, bulut yok). Garanti korunur.
 
-## Sürüm 0.3.0 — ne yapar
+## Sürüm 0.4.0 — ne yapar
 
 - **Kullanıcı girişi ve roller:** herkes kullanıcı adı ve parola ile girer. Üç rol:
   **Sistem Yöneticisi** (her şey + kullanıcı yönetimi ve işlem geçmişi), **Yazıcı Yöneticisi**
   (kullanıcı yönetimi dışında her şey: yazıcı ekleme/silme, komutlar, tarama, bildirim
   ayarları, dosya yükleme), **Gözetmen** (yalnız izler). Rol denetimi her API ucunda
   sunucu tarafında yapılır; arayüz yalnız yetkili düğmeleri gösterir.
-- **İşlem geçmişi (denetim kaydı):** giriş/çıkış, komutlar (durdur/başlat/iptal, hangi
-  yazıcı, hangi dosya), yazıcı ekleme/silme, tarama, bildirim ayarı, kullanıcı işlemleri
-  zaman ve IP ile kaydedilir; sistem yöneticisi kullanıcı başına görüntüler.
+- **İşlem geçmişi (denetim kaydı):** her kullanıcının yaptığı her değişiklik kaydedilir:
+  giriş/çıkış/başarısız giriş, komutlar (durdur/başlat/iptal; hangi yazıcı, hangi dosya),
+  dosya yükleme (ad, boyut, başlatıldı mı, hata), yazıcı ekleme/silme/güncelleme, tarama
+  başlat/iptal, bildirim ayarı ve testi, kullanıcı işlemleri, parola değişikliği; zaman ve
+  IP ile. Sistem yöneticisi kullanıcı başına ya da tümünü görüntüler.
+- **Dosya yükleme ve yazdırma ("Yükle" görünümü):** her yazıcı bir kart; ortadaki büyük
+  dosya adına tıklayınca G-code seçilir, "mevcut işlemi durduracak" uyarısı onaylanınca dosya
+  yazıcıya HTTP ile yüklenir ve baskı başlatılır. İlerleme kartta görünür. Gözetmen yalnız
+  dosya adını görür.
 - **Ağ tarama sihirbazı:** makinedeki alt ağları listeler, seçilen CIDR'da 9999 portunu
   paralel yoklar, yanıt verenlere WebSocket ile kimlik (hostname, model) sorar; bulunanları
   ad ve grup vererek toplu ekler. Elle IP ile ekleme de vardır.
@@ -100,7 +106,7 @@ Simülatör telemetri, kalp atışı ve `pause/stop/lightSw` komutlarını takli
 
 ```bash
 cd testler
-python3 -m unittest -v test_kullanicilar test_k2_protokol test_filo_uctan_uca test_telegram
+python3 -m unittest -v test_yukleme test_kullanicilar test_k2_protokol test_filo_uctan_uca test_telegram
 ```
 
 Telegram testleri sahte bir Telegram API sunucusuyla çalışır, internet gerekmez.
@@ -124,6 +130,7 @@ creamanage/
   filo.py          kayıt + bağlantı + tarama + olay orkestrasyonu, arayüz yayını (≤1/s/yazıcı)
   kullanicilar.py  roller, parola hash'i, oturumlar, giriş kilidi
   web.py           aiohttp: kimlik/rol ara katmanı, statik arayüz, REST API, /ws yayını
+  yukleme.py       HTTP dosya yükleme (/upload), /info model sorgusu, güvenli dosya adı
   telegram.py      Telegram bildirim kanalı (OlayMerkezi abonesi, toplu gönderim, 429 uyumu)
 web/               index.html, css/stil.css, js/uygulama.js (bağımlılıksız)
 araclar/sahte_yazici.py   K2 simülatörü
@@ -143,6 +150,7 @@ testler/           birim ve uçtan uca testler
 | `POST /api/yazicilar` | `{ad, ip, port?, grup?, notlar?}` |
 | `POST /api/yazicilar/toplu` | `{yazicilar:[{ip, ad, port, model, hostname, grup}]}` |
 | `GET/PUT/DELETE /api/yazicilar/{id}` | ayrıntı (+ham, +olaylar) / güncelle / sil |
+| `POST /api/yazicilar/{id}/dosya` | multipart `file` (+`baslat`=1/0): yükle ve yazdır (yazıcı yöneticisi) |
 | `POST /api/yazicilar/{id}/komut` | `{komut: duraklat\|surdur\|durdur\|isik\|nozul\|tabla\|fan, deger?}` |
 | `GET /api/aglar` | makinedeki alt ağlar |
 | `POST /api/tarama`, `GET /api/tarama`, `POST /api/tarama/iptal` | tarama işi |
@@ -175,6 +183,14 @@ belgelerinden derlenmiştir; tamamı `creamanage/k2_protokol.py` içinde tek yer
   ham telemetri panelden okunup tablo kesinleştirilmelidir.
 - Firmware güncellemesi alan adlarını değiştirebilir; yalnız `k2_protokol.py` güncellenir.
 
+**Dosya yükleme (Creality Print / OrcaSlicer'ın kullandığı yol):** `POST http://<ip>/upload/<ad>`
+multipart, alan `file` (80 başarısızsa 4408 denenir; çalışan port kaydedilir). Dosya K2
+ailesinde `/mnt/UDISK/printer_data/gcodes/` altına düşer; dizin, yazıcının bildirdiği
+dosya yolundan otomatik öğrenilir. Baskı `{"opGcodeFile":"printprt:<tam yol>"}` ile
+başlar. `GET http://<ip>/info` model kodunu verir (F008 = K2 Plus). CFS çok renkli baskı
+için Creality Print `colorMatch` + `multiColorPrint` mesajlarını kullanır; bu sürümde
+G-code yazıcıya sliced haliyle gönderilir, slot eşlemesi ileride eklenecek.
+
 Kamera: K2 ailesi WebRTC (`http://<ip>:8000/call/webrtc_local`); bu sürümde yok.
 
 ## Yol haritası
@@ -185,6 +201,6 @@ Kamera: K2 ailesi WebRTC (`http://<ip>:8000/call/webrtc_local`); bu sürümde yo
 2. Gerçek K2 Plus ile alan/durum doğrulaması, CFS (boxsInfo) kutu-slot görünümü.
 3. Kamera önizlemesi (WebRTC → go2rtc).
 4. HTTPS (ters vekil), oturum listesi ve uzaktan kapatma.
-5. Dosya gönderme ve baskı başlatma (HTTP yükleme + `opGcodeFile`), iş kuyruğu.
+5. CFS slot eşlemesi (colorMatch), iş kuyruğu, toplu yükleme (aynı dosyayı N yazıcıya).
 6. Geçmiş raporları: yazıcı kullanım oranı, baskı süreleri, hata sıklığı.
 7. Kurulum paketleri (`.deb`, Windows kurulum) ve systemd servisi.

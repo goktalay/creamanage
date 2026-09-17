@@ -98,6 +98,7 @@ class YaziciBaglantisi:
             "nozul": lambda: P.komut_nozul_sicaklik(float(deger)),
             "tabla": lambda: P.komut_tabla_sicaklik(float(deger)),
             "fan": lambda: P.komut_fan(int(deger)),
+            "baski_baslat": lambda: P.komut_baski_baslat(str(deger)),
         }.get(ad)
         if uret is None:
             raise ValueError(f"bilinmeyen komut: {ad}")

@@ -88,6 +88,17 @@ def komut_tabla_sicaklik(derece: float, no: int = 0) -> str:
     return komut_set({"bedTempControl": {"num": no, "val": derece}})
 
 
+def komut_baski_baslat(tam_yol: str) -> str:
+    """Yazıcıdaki dosyayı basar: ``printprt:/mnt/UDISK/printer_data/gcodes/parca.gcode``."""
+    return komut_set({"opGcodeFile": f"printprt:{tam_yol}"})
+
+
+def dosya_dizini(yol: str) -> str:
+    """'/mnt/UDISK/printer_data/gcodes/a.gcode' → '/mnt/UDISK/printer_data/gcodes' (yol değilse boş)."""
+    yol = (yol or "").replace("\\", "/")
+    return yol.rsplit("/", 1)[0] if yol.startswith("/") and "/" in yol[1:] else ""
+
+
 def komut_fan(yuzde: int) -> str:
     return komut_set({"fan": max(0, min(100, int(yuzde)))})
 

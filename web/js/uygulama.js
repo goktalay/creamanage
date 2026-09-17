@@ -134,9 +134,37 @@
   function gorunumUygula() {
     $("#kartlar").hidden = st.gorunum !== "kart";
     $("#sade").hidden = st.gorunum !== "sade";
+    $("#yukle").hidden = st.gorunum !== "yukle";
     $$("#gorunum-secici button").forEach(b => b.classList.toggle("aktif", b.dataset.gorunum === st.gorunum));
   }
+  const yuklemeler = new Map();   // yazıcı id → {yuzde, metin}
+  function yukleKartHtml(y) {
+    const c = y.canli || {}, d = c.durum || "cevrimdisi", yk = yuklemeler.get(y.id);
+    const yetkiliMi = yetkili("yazici_yoneticisi"), bos = !c.dosya;
+    let orta;
+    if (yk) orta = `<div class="dosya-metin">${kacis(yk.metin)}<progress max="100" value="${yk.yuzde}"></progress></div>`;
+    else if (yetkiliMi) orta = `<button type="button" class="dosya-btn ${bos ? "bos" : ""}" ${d === "cevrimdisi" ? "disabled" : ""} title="${kacis(c.dosya_yolu || "")}">${bos ? "Dosya seç ve yazdır" : kacis(c.dosya)}<small>${d === "cevrimdisi" ? "yazıcı çevrimdışı" : (bos ? "" : "değiştirmek için tıklayın")}</small></button>`;
+    else orta = `<div class="dosya-metin" title="${kacis(c.dosya_yolu || "")}">${bos ? '<span class="ipucu">–</span>' : kacis(c.dosya)}</div>`;
+    const ilerleme = c.ilerleme != null && (d === "basiyor" || d === "duraklatildi") ? "%" + Math.round(c.ilerleme) : "";
+    return `<div class="bas"><span title="${kacis(y.ad)}">${kacis(y.ad)}</span><span class="durum">${DURUM_AD[d] || d}</span></div>
+      <div class="orta">${orta}</div>
+      <div class="alt"><span>${kacis(y.ip)}</span><span>${ilerleme}${y.grup ? (ilerleme ? " · " : "") + kacis(y.grup) : ""}</span></div>`;
+  }
+  function cizYukle() {
+    $("#yukle").innerHTML = filtreli().map(y => {
+      const d = (y.canli || {}).durum || "cevrimdisi";
+      return `<div class="ykart ${d}" data-id="${y.id}" style="--renk: var(--d-${d})">${yukleKartHtml(y)}</div>`;
+    }).join("");
+  }
   function cizKart(y) {
+    if (st.gorunum === "yukle") {
+      const k = $(`#yukle .ykart[data-id="${y.id}"]`), gorunur = filtreli().some(f => f.id === y.id);
+      if (!gorunur) { if (k) k.remove(); sonucSayisi(); bosMu(); return; }
+      if (!k) { cizHepsi(); return; }
+      const d = (y.canli || {}).durum || "cevrimdisi";
+      k.className = "ykart " + d; k.style.setProperty("--renk", `var(--d-${d})`); k.innerHTML = yukleKartHtml(y);
+      return;
+    }
     if (st.gorunum === "sade") {
       const tr = $(`#sade tr[data-id="${y.id}"]`), gorunur = filtreli().some(f => f.id === y.id);
       if (!gorunur) { if (tr) tr.remove(); sonucSayisi(); bosMu(); return; }
@@ -156,6 +184,7 @@
   function cizHepsi() {
     gorunumUygula();
     if (st.gorunum === "sade") { cizSade(); cizSayaclar(); cizGruplar(); sonucSayisi(); bosMu(); return; }
+    if (st.gorunum === "yukle") { cizYukle(); cizSayaclar(); cizGruplar(); sonucSayisi(); bosMu(); return; }
     const kap = $("#kartlar");
     kap.innerHTML = filtreli().map(y => {
       const d = (y.canli || {}).durum || "cevrimdisi";
@@ -442,13 +471,13 @@
   const EYLEM_AD = { giris: "Giriş yaptı", giris_basarisiz: "Başarısız giriş", cikis: "Çıkış yaptı", kurulum: "İlk kurulum",
     parola_degistirdi: "Parolasını değiştirdi", kullanici_ekledi: "Kullanıcı ekledi", kullanici_guncelledi: "Kullanıcı güncelledi", kullanici_sildi: "Kullanıcı sildi",
     yazici_ekledi: "Yazıcı ekledi", yazici_guncelledi: "Yazıcı güncelledi", yazici_sildi: "Yazıcı sildi", tarama_baslatti: "Ağ taraması başlattı",
-    bildirim_ayarladi: "Bildirim ayarı değiştirdi", komut_duraklat: "Baskıyı durdurdu (duraklattı)", komut_surdur: "Baskıyı başlattı (sürdürdü)",
+    bildirim_ayarladi: "Bildirim ayarı değiştirdi", bildirim_test: "Bildirim testi gönderdi", tarama_iptal: "Ağ taramasını iptal etti", komut_duraklat: "Baskıyı durdurdu (duraklattı)", komut_surdur: "Baskıyı başlattı (sürdürdü)",
     komut_durdur: "Baskıyı iptal etti", komut_isik: "Işığı değiştirdi", komut_nozul: "Nozul sıcaklığı ayarladı", komut_tabla: "Tabla sıcaklığı ayarladı",
-    komut_fan: "Fan ayarladı", dosya_yukledi: "Dosya yükledi" };
+    komut_fan: "Fan ayarladı", dosya_yukledi: "Dosya yükledi ve yazdırdı", dosya_yukleme_hatasi: "Dosya yükleme HATASI" };
   async function gecmisAc(id) {
     try {
-      const v = await api(`/api/kullanicilar/${id}/gecmis`);
-      $("#gecmis-baslik").textContent = `İşlem geçmişi — ${v.kullanici.ad || v.kullanici.kullanici_adi} (${v.kullanici.kullanici_adi})`;
+      const v = await api(id == null ? "/api/kullanicilar/gecmis?limit=1000" : `/api/kullanicilar/${id}/gecmis`);
+      $("#gecmis-baslik").textContent = id == null ? "Tüm kullanıcıların işlem geçmişi" : `İşlem geçmişi — ${v.kullanici.ad || v.kullanici.kullanici_adi} (${v.kullanici.kullanici_adi})`;
       $("#gecmis-tablo tbody").innerHTML = v.gecmis.map(g => `<tr class="${g.eylem === "komut_durdur" || g.eylem === "giris_basarisiz" ? "kritik" : ""}">
         <td class="zaman">${new Date(g.zaman * 1000).toLocaleString("tr-TR")}</td><td>${kacis(g.kullanici_adi)}</td>
         <td class="eylem">${kacis(EYLEM_AD[g.eylem] || g.eylem)}</td><td>${kacis(g.hedef)}</td><td>${kacis(g.ayrinti)}</td><td class="ipucu">${kacis(g.ip)}</td></tr>`).join("")
@@ -457,6 +486,7 @@
     } catch (e) { bildir(e.message); }
   }
   $("#btn-kullanicilar").addEventListener("click", kullanicilarAc);
+  $("#btn-tum-gecmis").addEventListener("click", () => gecmisAc(null));
   $("#btn-parola").addEventListener("click", () => { $("#parola-form").reset(); ac("ortu-parola"); });
   $("#parola-form").addEventListener("submit", async (e) => {
     e.preventDefault(); const f = e.target;
@@ -477,6 +507,38 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") $$(".ortu").forEach(o => { if (!o.hidden) kapat(o.id); }); });
   $("#kartlar").addEventListener("click", (e) => { const k = e.target.closest(".kart"); if (k) ayrintiAc(Number(k.dataset.id)); });
   $("#sade").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) ayrintiAc(Number(tr.dataset.id)); });
+  let yukleHedef = null;
+  $("#yukle").addEventListener("click", (e) => {
+    const b = e.target.closest(".dosya-btn");
+    const k = e.target.closest(".ykart"); if (!k) return;
+    if (b && !b.disabled) { yukleHedef = Number(k.dataset.id); $("#dosya-secici").value = ""; $("#dosya-secici").click(); return; }
+    if (!b) ayrintiAc(Number(k.dataset.id));
+  });
+  $("#dosya-secici").addEventListener("change", () => {
+    const dosya = $("#dosya-secici").files[0], id = yukleHedef, y = st.yazicilar.get(id);
+    if (!dosya || !y) return;
+    const c = y.canli || {}, mesaj = (c.durum === "basiyor" || c.durum === "duraklatildi")
+      ? `DİKKAT: ${y.ad} şu an "${c.dosya}" basıyor (%${Math.round(c.ilerleme || 0)}).\n\nBu işlem mevcut işlemi durduracak ve "${dosya.name}" dosyasını yazdırmaya başlayacak.\n\nDevam edilsin mi?`
+      : `${y.ad} yazıcısına "${dosya.name}" yüklenip yazdırılacak.\n\nBu işlem mevcut işlemi durduracak. Devam edilsin mi?`;
+    if (!confirm(mesaj)) return;
+    dosyaYukle(id, dosya);
+  });
+  function dosyaYukle(id, dosya) {
+    const y = st.yazicilar.get(id); if (!y) return;
+    yuklemeler.set(id, { yuzde: 0, metin: `Yükleniyor: ${dosya.name}` }); cizKart(y);
+    const fd = new FormData(); fd.append("file", dosya, dosya.name); fd.append("baslat", "1");
+    const xhr = new XMLHttpRequest(); xhr.open("POST", `/api/yazicilar/${id}/dosya`);
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) { yuklemeler.set(id, { yuzde: Math.round(100 * e.loaded / e.total), metin: `Yükleniyor: ${dosya.name} (%${Math.round(100 * e.loaded / e.total)})` }); cizKart(st.yazicilar.get(id)); } };
+    xhr.onload = () => {
+      yuklemeler.delete(id); cizKart(st.yazicilar.get(id));
+      let v = {}; try { v = JSON.parse(xhr.responseText); } catch (e) { /* boş */ }
+      if (xhr.status === 401) { location.href = "/giris"; return; }
+      if (xhr.status >= 200 && xhr.status < 300) bildir(v.baslatildi ? `${y.ad}: ${v.dosya_adi} yüklendi, baskı başlatıldı` : `${y.ad}: ${v.dosya_adi} yüklendi ama baskı başlatılamadı (bağlantı yok)`, 6000);
+      else bildir(`${y.ad}: yükleme başarısız — ${v.hata || xhr.statusText}`, 8000);
+    };
+    xhr.onerror = () => { yuklemeler.delete(id); cizKart(st.yazicilar.get(id)); bildir(`${y.ad}: yükleme sırasında ağ hatası`, 8000); };
+    xhr.send(fd);
+  }
   $$("#gorunum-secici button").forEach(b => b.addEventListener("click", () => {
     st.gorunum = b.dataset.gorunum;
     try { localStorage.setItem("creamanage.gorunum", st.gorunum); } catch (e) { /* yok say */ }

@@ -5,6 +5,8 @@ import asyncio
 import ipaddress
 import json
 import logging
+import os
+import tempfile
 import weakref
 from pathlib import Path
 
@@ -14,6 +16,7 @@ from . import k2_protokol as P
 from .filo import Filo
 from .kullanicilar import CEREZ_ADI, OTURUM_EN_FAZLA_SN, ROL_ADLARI, KullaniciYonetimi, gorunum as k_gorunum, yetkili_mi
 from .telegram import TelegramBildirici
+from . import yukleme as Y
 from .surum import FIRMA, SURUM, URUN_ADI, URUN_KODU
 
 log = logging.getLogger("creamanage.web")
@@ -81,7 +84,7 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
             return _hata("bu işlem için yetkiniz yok", 403)
         return await handler(istek)
 
-    app = web.Application(middlewares=[kimlik_katmani])
+    app = web.Application(middlewares=[kimlik_katmani], client_max_size=Y.EN_BUYUK_DOSYA)
     app[FILO_ANAHTAR] = filo
     app[WS_ISTEMCILER] = weakref.WeakSet()
 
@@ -250,7 +253,8 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
         port = int(v.get("port") or P.WS_PORT)
         kayit = await filo.yazici_ekle(str(v.get("ad", "")), ip, port,
                                        model=str(v.get("model", "")), hostname=str(v.get("hostname", "")),
-                                       grup=str(v.get("grup", "")), notlar=str(v.get("notlar", "")))
+                                       grup=str(v.get("grup", "")), notlar=str(v.get("notlar", "")),
+                                       http_port=v.get("http_port"))
         _denetim(istek, "yazici_ekledi", f"{kayit['ad']} ({ip})")
         return _json({"yazici": kayit}, 201)
 
@@ -293,6 +297,8 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
             alanlar["ip"] = ip
         if "port" in v:
             alanlar["port"] = int(v["port"])
+        if "http_port" in v:
+            alanlar["http_port"] = int(v["http_port"])
         if "etkin" in v:
             alanlar["etkin"] = 1 if v["etkin"] else 0
         kayit = await filo.yazici_guncelle(yid, **alanlar)
@@ -325,6 +331,49 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
                  + ("gönderildi" if sonuc else "GÖNDERİLEMEDİ: yazıcı bağlı değil"))
         return _json({"gonderildi": sonuc})
 
+    async def dosya_yukle(istek):
+        """multipart: file (zorunlu), baslat (1/0, varsayılan 1). Yükler ve baskıyı başlatır."""
+        yid = int(istek.match_info["id"])
+        if yid not in filo.kayitlar:
+            return _hata("yazıcı bulunamadı", 404)
+        okuyucu = await istek.multipart()
+        dosya_adi, baslat, gecici = "", True, None
+        try:
+            async for parca in okuyucu:
+                if parca.name == "baslat":
+                    baslat = (await parca.text()).strip() not in ("0", "false", "hayir", "")
+                elif parca.name == "file":
+                    dosya_adi = Y.guvenli_dosya_adi(parca.filename or "")
+                    if not Y.uzanti_izinli_mi(dosya_adi):
+                        return _hata(f"yalnız {', '.join(Y.IZINLI_UZANTILAR)} dosyaları yüklenebilir")
+                    fd, gecici = tempfile.mkstemp(prefix="creamanage_", suffix="_" + dosya_adi)
+                    boyut = 0
+                    with os.fdopen(fd, "wb") as f:
+                        while True:
+                            veri = await parca.read_chunk(1024 * 1024)
+                            if not veri:
+                                break
+                            boyut += len(veri)
+                            if boyut > Y.EN_BUYUK_DOSYA:
+                                return _hata("dosya çok büyük", 413)
+                            f.write(veri)
+            if not gecici or not dosya_adi:
+                return _hata("file alanı eksik")
+            try:
+                sonuc = await filo.dosya_yukle_ve_baslat(yid, dosya_adi, gecici, baslat, istek["kullanici"]["kullanici_adi"])
+            except RuntimeError as e:
+                _denetim(istek, "dosya_yukleme_hatasi", _yazici_etiketi(yid), f"{dosya_adi}: {e}")
+                return _hata(str(e), 502)
+            _denetim(istek, "dosya_yukledi", _yazici_etiketi(yid),
+                     f"{sonuc['dosya_adi']} ({boyut // 1024} KB)" + ("; baskı başlatıldı" if sonuc["baslatildi"] else ("; başlatılmadı" if not baslat else "; BAŞLATILAMADI")))
+            return _json(sonuc, 201)
+        finally:
+            if gecici:
+                try:
+                    os.unlink(gecici)
+                except OSError:
+                    pass
+
     async def aglar(_):
         return _json({"aglar": filo.aglar()})
 
@@ -354,6 +403,7 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
         if filo.tarama is None:
             return _hata("tarama yok", 404)
         filo.tarama.iptal()
+        _denetim(istek, "tarama_iptal", filo.tarama.cidr)
         return _json({"iptal": True})
 
     async def olaylar(istek):
@@ -399,6 +449,7 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
         if not (sohbetler or tg.ayar["sohbetler"]):
             return _hata("sohbet kimliği girilmemiş")
         hatalar = await tg.test_mesaji(token, sohbetler)
+        _denetim(istek, "bildirim_test", "Telegram", "başarılı" if not hatalar else "; ".join(hatalar))
         return _json({"basarili": not hatalar, "hatalar": hatalar})
 
     async def telegram_sohbetler(istek):
@@ -450,6 +501,7 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
     app.router.add_put(r"/api/yazicilar/{id:\d+}", yazici_guncelle)
     app.router.add_delete(r"/api/yazicilar/{id:\d+}", yazici_sil)
     app.router.add_post(r"/api/yazicilar/{id:\d+}/komut", komut)
+    app.router.add_post(r"/api/yazicilar/{id:\d+}/dosya", dosya_yukle)
     app.router.add_get("/api/aglar", aglar)
     app.router.add_post("/api/tarama", tarama_baslat)
     app.router.add_get("/api/tarama", tarama_durum)

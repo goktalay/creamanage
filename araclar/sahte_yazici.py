@@ -41,12 +41,15 @@ class SahteYazici:
         }
         self.istemciler: set[web.WebSocketResponse] = set()
         self.gelen_komutlar: list[dict] = []
+        self.yuklenen_dosyalar: list[tuple[str, int]] = []   # (ad, boyut)
         self._runner: web.AppRunner | None = None
         self._gorev: asyncio.Task | None = None
 
     async def baslat(self) -> None:
-        app = web.Application()
+        app = web.Application(client_max_size=1024 * 1024 * 1024)
         app.router.add_get("/", self._ws)
+        app.router.add_get("/info", self._info)
+        app.router.add_post("/upload/{ad}", self._upload)
         self._runner = web.AppRunner(app, access_log=None)
         await self._runner.setup()
         await web.TCPSite(self._runner, self.ip, self.port).start()
@@ -64,6 +67,23 @@ class SahteYazici:
         self.durum.update({"state": 1, "printFileName": dosya, "printProgress": 0,
                            "TotalLayer": katman, "layer": 0, "printLeftTime": katman * 30,
                            "printJobTime": 0, "targetNozzleTemp": 220, "targetBedTemp0": 60})
+
+    async def _info(self, _):
+        return web.json_response({"model": "F008", "hostname": self.hostname, "modelVersion": "V1.2.3.4"})
+
+    async def _upload(self, istek: web.Request):
+        ad = istek.match_info["ad"]
+        okuyucu = await istek.multipart()
+        boyut = 0
+        async for parca in okuyucu:
+            if parca.name == "file":
+                while True:
+                    veri = await parca.read_chunk(65536)
+                    if not veri:
+                        break
+                    boyut += len(veri)
+        self.yuklenen_dosyalar.append((ad, boyut))
+        return web.json_response({"code": 200, "msg": "ok", "size": boyut})
 
     async def _ws(self, istek: web.Request) -> web.WebSocketResponse:
         ws = web.WebSocketResponse(protocols=[P.ALT_PROTOKOL])
@@ -104,6 +124,7 @@ class SahteYazici:
         op = p.get("opGcodeFile")
         if isinstance(op, str) and op.startswith("printprt:"):
             self.baski_baslat(op.split("/")[-1] or "dosya.gcode", katman=100)
+            self.durum["printFileName"] = op[len("printprt:"):]      # gerçek yazıcı gibi tam yol
         if "nozzleTempControl" in p:
             self.durum["targetNozzleTemp"] = float(p["nozzleTempControl"])
         if isinstance(p.get("bedTempControl"), dict):

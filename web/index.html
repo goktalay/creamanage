@@ -44,11 +44,14 @@
       <div class="secici" id="gorunum-secici" title="Görünüm">
         <button type="button" data-gorunum="kart" class="aktif">Kartlar</button>
         <button type="button" data-gorunum="sade">Sade</button>
+        <button type="button" data-gorunum="yukle">Yükle</button>
       </div>
       <span class="bosluk"></span>
       <span class="ipucu" id="sonuc-sayisi"></span>
     </div>
     <div class="kartlar" id="kartlar"></div>
+    <div class="yukle-kartlar" id="yukle" hidden></div>
+    <input type="file" id="dosya-secici" accept=".gcode,.gz,.gco,.g,.3mf" hidden>
     <table class="sade" id="sade" hidden>
       <thead><tr><th>Yazıcı</th><th>Dosya</th><th class="sag-hiza">İlerleme</th></tr></thead>
       <tbody></tbody>
@@ -192,7 +195,7 @@
   <div class="modal genis">
     <div class="modal-baslik">
       <h2>Kullanıcılar</h2>
-      <button class="btn btn-ikincil" data-kapat="ortu-kullanicilar">Kapat</button>
+      <div class="satir"><button class="btn" id="btn-tum-gecmis">Tüm İşlem Geçmişi</button><button class="btn btn-ikincil" data-kapat="ortu-kullanicilar">Kapat</button></div>
     </div>
     <p class="ipucu"><b>Sistem Yöneticisi</b> her şeyi yapar. <b>Yazıcı Yöneticisi</b> kullanıcı yönetimi dışında her şeyi yapar (yazıcı ekleme, komut, tarama, bildirim ayarları, dosya yükleme). <b>Gözetmen</b> yalnız izler.</p>
     <table class="tablo" id="kullanici-tablo">

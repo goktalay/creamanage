@@ -12,6 +12,7 @@ from .olaylar import (O_YAZICI_EKLENDI, O_YAZICI_SILINDI, SEVIYE, OlayMerkezi,
                       gecis_olaylari)
 from .tarayici import Tarama, yerel_aglar
 from .veritabani import Veritabani
+from . import yukleme as Y
 
 log = logging.getLogger("creamanage.filo")
 
@@ -91,6 +92,9 @@ class Filo:
             guncelle["hostname"] = yeni["hostname"]
             if kayit.get("ad") in ("", kayit.get("ip")):
                 guncelle["ad"] = yeni["hostname"]     # elle IP ile eklenene hostname'i ad yap
+        dizin = P.dosya_dizini(yeni.get("dosya_yolu", ""))
+        if dizin and dizin != kayit.get("gcode_dizini"):
+            guncelle["gcode_dizini"] = dizin       # yükleme hedefi telemetriden öğrenilir
         if guncelle:
             k = self.vt.yazici_guncelle(yid, **guncelle)
             if k:
@@ -151,7 +155,7 @@ class Filo:
             ad = ek.get("hostname") or ip
         kayit = self.vt.yazici_ekle(ad, ip, port, model=ek.get("model", ""),
                                     hostname=ek.get("hostname", ""), grup=ek.get("grup", ""),
-                                    notlar=ek.get("notlar", ""))
+                                    notlar=ek.get("notlar", ""), http_port=int(ek.get("http_port") or Y.HTTP_PORT_VARSAYILAN))
         self.kayitlar[kayit["id"]] = kayit
         self._baglanti_kur(kayit)
         await self._olay(O_YAZICI_EKLENDI, f"{kayit['ad']} ({ip}) eklendi", kayit["id"])
@@ -203,6 +207,29 @@ class Filo:
         await self._olay("komut", f"{kayit.get('ad', yid)}: {ad} komutu gönderildi"
                          + ("" if sonuc else " (başarısız: bağlı değil)"), yid, {"komut": ad, "deger": deger})
         return sonuc
+
+    # --- dosya yükleme ---
+    async def dosya_yukle_ve_baslat(self, yid: int, dosya_adi: str, yerel_yol, baslat: bool = True,
+                                    kullanici: str = "") -> dict:
+        kayit = self.kayitlar.get(yid)
+        if kayit is None:
+            raise LookupError("yazıcı bulunamadı")
+        sonuc = await Y.dosya_yukle(kayit["ip"], dosya_adi, yerel_yol, int(kayit.get("http_port") or Y.HTTP_PORT_VARSAYILAN))
+        if sonuc["port"] != int(kayit.get("http_port") or 0):
+            k = self.vt.yazici_guncelle(yid, http_port=sonuc["port"])
+            if k:
+                self.kayitlar[yid] = k
+        yol = Y.hedef_yol(kayit.get("gcode_dizini") or Y.GCODE_DIZINI_VARSAYILAN, sonuc["dosya_adi"])
+        await self._olay("dosya_yuklendi", f"{kayit['ad']}: dosya yüklendi {sonuc['dosya_adi']}" + (f" ({kullanici})" if kullanici else ""),
+                         yid, {"dosya": sonuc["dosya_adi"], "yol": yol})
+        baslatildi = False
+        if baslat:
+            b = self.baglantilar.get(yid)
+            baslatildi = bool(b and await b.komut("baski_baslat", yol))
+            await self._olay("baski_baslatildi" if baslatildi else "komut",
+                             f"{kayit['ad']}: baskı başlatma komutu {'gönderildi' if baslatildi else 'GÖNDERİLEMEDİ (bağlı değil)'} {sonuc['dosya_adi']}",
+                             yid, {"dosya": sonuc["dosya_adi"], "yol": yol})
+        return {"dosya_adi": sonuc["dosya_adi"], "yol": yol, "port": sonuc["port"], "baslatildi": baslatildi}
 
     # --- tarama ---
     def aglar(self) -> list[dict]:
