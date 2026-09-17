@@ -10,6 +10,9 @@ User=creamanage
 Group=creamanage
 WorkingDirectory=/opt/creamanage
 EnvironmentFile=/etc/creamanage/creamanage.env
+Environment=PYTHONPATH=/opt/creamanage
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
 ExecStart=/opt/creamanage/venv/bin/python /opt/creamanage/main.py
 Restart=always
 RestartSec=3
