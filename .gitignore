@@ -16,3 +16,5 @@ venv/
 .env.*
 *.pem
 *.key
+
+# Logo dosyaları (web/logo_gokkubbe.png, web/logo_mke.png) depoya girebilir; ikili büyük dosyalar için Git LFS gerekmez.

@@ -10,11 +10,21 @@
 </head>
 <body class="giris-sayfa">
 <canvas id="dunya" class="dunya" aria-hidden="true"></canvas>
-<main class="giris-kutu">
-  <div class="marka">
-    <img class="logo" src="/static/ikon.svg" alt="CreaManage">
-    <div><h1>CreaManage</h1><small>Yazıcı Filo Merkezi · Gökkubbe Teknoloji A.Ş.</small></div>
+<header class="giris-ust">
+  <a class="giris-logo sol" href="https://gokkubbetech.com" target="_blank" rel="noopener">
+    <img src="/static/logo_gokkubbe.png" alt="Gökkubbe Tech" onerror="this.parentNode.classList.add('yok')">
+    <span class="logo-metin">GÖKKUBBE<small>TECH</small></span>
+  </a>
+  <div class="giris-orta">
+    <img class="logo" src="/static/ikon.svg" alt="">
+    <div><h1>CreaManage</h1><small>Yazıcı Filo Merkezi</small></div>
   </div>
+  <div class="giris-logo sag">
+    <img src="/static/logo_mke.png" alt="MKE iştirakidir" onerror="this.parentNode.classList.add('yok')">
+    <span class="logo-metin"><b>MKE</b> İŞTİRAKİDİR</span>
+  </div>
+</header>
+<main class="giris-kutu">
 
   <form class="form" id="giris-form" hidden>
     <h2>Giriş</h2>
@@ -35,6 +45,7 @@
     <p class="ipucu hata" id="kurulum-hata"></p>
   </form>
 </main>
+<footer class="giris-alt">© Gökkubbe Teknoloji Anonim Şirketi · CreaManage</footer>
 <script>
 (function () {
   const $ = (s) => document.querySelector(s);

@@ -59,6 +59,10 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
   düzenleme, ekleme, silme; CSV/JSON/HTML dosyasından içe aktarma.
 - **Yenileme aralığı:** alt çubukta 1 sn / 3 sn / 5 sn / 10 sn / 1 dk; yazıcı ekranları
   seçilen aralıkta yenilenir, tercih kullanıcı hesabına kaydedilir.
+- **Giriş sayfası:** üstte başlık (solda Gökkubbe Tech logosu, ortada uygulama adı, sağda
+  "MKE İştirakidir" logosu), arkada çizgisel dönen dünya. Logo dosyaları `web/logo_gokkubbe.png`
+  ve `web/logo_mke.png` olarak eklenir (PNG, şeffaf arka plan, ~56 px yükseklik için yeterli
+  çözünürlük); dosya yoksa metin karşılığı görünür.
 - **Gece / gündüz teması:** üst çubuktaki güneş/ay düğmesiyle; tercih kullanıcı hesabına
   kaydedilir (her cihazda aynı), seçilmemişse işletim sistemi teması izlenir.
 - **Yazıcı ayrıntısı:** ikonlu bilgi kartları (dosya, ilerleme, süreler, sıcaklıklar, fan,
