@@ -1,0 +1,14 @@
+# çalışma verisi
+creamanage.sqlite
+creamanage.sqlite-journal
+*.log
+# python
+__pycache__/
+*.pyc
+venv/
+.venv/
+# sırlar / ortam
+.env
+.env.*
+*.pem
+*.key
