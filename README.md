@@ -83,26 +83,29 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
 
 ## Ubuntu'da servis olarak kurulum (önerilen)
 
+Uygulama klasörü sunucuda nerede duruyorsa oradan, olduğu yerde kurulur; betik internetten
+kod çekmez, dosyaları kopyalamaz.
+
 ```bash
-git clone https://github.com/goktalay/creamanage.git
-cd creamanage
+cd /uygulamanin/oldugu/klasor          # içinde main.py olan klasör
 sudo bash kurulum/ubuntu_kur.sh
 ```
 
-Betik `creamanage` sistem kullanıcısını açar, kodu `/opt/creamanage` altına kurar (sanal ortam
-ile), veriyi `/var/lib/creamanage` (SQLite, telemetri, hata kodu tablosu) altında tutar, ayarları
-`/etc/creamanage/creamanage.env` dosyasına yazar ve `creamanage` systemd servisini açılışta
-başlayacak şekilde etkinleştirir. Yeniden çalıştırmak güvenlidir.
+Betik `creamanage` sistem kullanıcısını açar, klasörün içinde `venv` sanal ortamını kurar,
+veriyi `/var/lib/creamanage` altında tutar (SQLite, telemetri, hata kodu tablosu), ayarları
+`/etc/creamanage/creamanage.env` dosyasına yazar ve `creamanage` systemd servisini bu klasörü
+gösterecek şekilde açılışta başlayacak biçimde etkinleştirir. Yeniden çalıştırmak güvenlidir.
 
 | İşlem | Komut |
 |---|---|
 | Durum / günlük | `systemctl status creamanage` · `journalctl -u creamanage -f` |
 | Yeniden başlat | `sudo systemctl restart creamanage` |
-| Güncelle | `sudo bash /opt/creamanage/kurulum/guncelle.sh` |
+| Dosyaları güncelledikten sonra | `sudo bash kurulum/guncelle.sh` (bağımlılıklar + servis yenileme) |
 | Port / ayar değiştir | `/etc/creamanage/creamanage.env` düzenle, sonra restart |
-| Parola sıfırla | `sudo -u creamanage /opt/creamanage/venv/bin/python /opt/creamanage/araclar/kullanici.py --veritabani /var/lib/creamanage/creamanage.sqlite parola mkaderoglu` |
+| Parola sıfırla | `sudo -u creamanage ./venv/bin/python araclar/kullanici.py --veritabani /var/lib/creamanage/creamanage.sqlite parola mkaderoglu` |
 | Yedek | `/var/lib/creamanage` dizinini kopyalayın (servis çalışırken de alınabilir, WAL modu) |
 
+Veri dizinini değiştirmek için kurulumdan önce `CREAMANAGE_VERI=/baska/dizin` verin.
 Güvenlik duvarı: `sudo ufw allow 8090/tcp`. Ağ dışından erişim için önüne HTTPS ters vekil
 (nginx/caddy) koyun; kamera modülünün tarayıcı WebRTC yolu yalnız HTTP sayfada çalışır, HTTPS
 kullanılıyorsa sunucu taraflı kamera URL'si (go2rtc) tanımlayın.
