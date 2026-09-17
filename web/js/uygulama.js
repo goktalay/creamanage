@@ -11,8 +11,12 @@
   const $ = (s, k) => (k || document).querySelector(s);
   const $$ = (s, k) => Array.from((k || document).querySelectorAll(s));
 
-  const st = { yazicilar: new Map(), olaylar: [], tarama: null, acikYazici: null, ws: null, gorunum: "kart", ben: null };
-  try { st.gorunum = localStorage.getItem("creamanage.gorunum") === "sade" ? "sade" : "kart"; } catch (e) { /* özel pencere */ }
+  const MODULLER = { yazicilar: "Yazıcılar", dosya_listesi: "Dosya Listesi", dosya_yoneticisi: "Dosya Yöneticisi",
+    olaylar: "Olaylar", bildirimler: "Bildirimler", kullanicilar: "Kullanıcılar" };
+  const MODUL_GORUNUM = { yazicilar: "kart", dosya_listesi: "sade", dosya_yoneticisi: "yukle" };
+  const st = { yazicilar: new Map(), olaylar: [], tarama: null, acikYazici: null, ws: null, gorunum: "kart", ben: null, modul: "yazicilar" };
+  try { const m = localStorage.getItem("creamanage.modul"); if (MODULLER[m]) st.modul = m; } catch (e) { /* özel pencere */ }
+  st.gorunum = MODUL_GORUNUM[st.modul] || "kart";
 
   // ---------- yardımcılar ----------
   function kacis(s) {
@@ -47,9 +51,20 @@
   }
   const ROL_SIRA = { gozetmen: 1, yazici_yoneticisi: 2, sistem_yoneticisi: 3 };
   const yetkili = (rol) => st.ben && ROL_SIRA[st.ben.rol] >= ROL_SIRA[rol];
+  function basHarfler(ad) {
+    const p = String(ad || "?").trim().split(/\s+/).filter(Boolean);
+    return ((p[0] || "?")[0] + (p.length > 1 ? p[p.length - 1][0] : "")).toLocaleUpperCase("tr-TR");
+  }
+  function avatarRenk(metin) { let h = 0; for (const c of String(metin)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return `hsl(${h % 360} 45% 45%)`; }
   function rolUygula() {
     $$("[data-rol]").forEach(el => el.classList.toggle("yetkisiz", !yetkili(el.dataset.rol)));
-    if (st.ben) { $("#ben-ad").textContent = st.ben.ad || st.ben.kullanici_adi; $("#ben-rol").textContent = st.ben.rol_adi; }
+    if (st.ben) {
+      $("#ben-ad").textContent = st.ben.ad || st.ben.kullanici_adi; $("#ben-rol").textContent = st.ben.rol_adi;
+      const bh = basHarfler(st.ben.ad || st.ben.kullanici_adi), renk = avatarRenk(st.ben.kullanici_adi);
+      $$("#avatar, #avatar-buyuk").forEach(a => { a.textContent = bh; a.style.setProperty("--avatar-renk", renk); });
+      const uyg = $(`.uyg[data-modul="${st.modul}"]`);
+      if (uyg && uyg.dataset.rol && !yetkili(uyg.dataset.rol)) modulAc("yazicilar");
+    }
   }
   const post = (yol, govde) => api(yol, { method: "POST", body: JSON.stringify(govde || {}) });
   const put = (yol, govde) => api(yol, { method: "PUT", body: JSON.stringify(govde || {}) });
@@ -79,7 +94,7 @@
         st.yazicilar.delete(m.id); cizHepsi();
         if (st.acikYazici === m.id) kapat("ortu-ayrinti");
       } else if (m.tur === "olay") {
-        st.olaylar.unshift(m.olay); st.olaylar = st.olaylar.slice(0, 200); cizOlaylar();
+        st.olaylar.unshift(m.olay); st.olaylar = st.olaylar.slice(0, 300); if (st.modul === "olaylar") cizOlaylar();
         if (m.olay.seviye === "kritik" || m.olay.seviye === "uyari") bildir(m.olay.mesaj, 5000);
       } else if (m.tur === "tarama") {
         st.tarama = m.tarama; taramaGuncelle();
@@ -132,11 +147,22 @@
     }).join("");
   }
   function gorunumUygula() {
-    $("#kartlar").hidden = st.gorunum !== "kart";
-    $("#sade").hidden = st.gorunum !== "sade";
-    $("#yukle").hidden = st.gorunum !== "yukle";
-    $$("#gorunum-secici button").forEach(b => b.classList.toggle("aktif", b.dataset.gorunum === st.gorunum));
+    Object.keys(MODULLER).forEach(m => { const el = $("#modul-" + m); if (el) el.hidden = m !== st.modul; });
+    $("#yazici-arac").hidden = !MODUL_GORUNUM[st.modul];
+    $("#modul-baslik").textContent = MODULLER[st.modul] || "";
+    $$(".uyg[data-modul]").forEach(b => b.classList.toggle("aktif", b.dataset.modul === st.modul));
   }
+  function modulAc(ad) {
+    if (!MODULLER[ad]) return;
+    st.modul = ad; st.gorunum = MODUL_GORUNUM[ad] || st.gorunum;
+    try { localStorage.setItem("creamanage.modul", ad); } catch (e) { /* yok say */ }
+    menuKapat();
+    if (MODUL_GORUNUM[ad]) cizHepsi(); else gorunumUygula();
+    if (ad === "kullanicilar") kullanicilarAc();
+    if (ad === "bildirimler") bildirimAc();
+    if (ad === "olaylar") cizOlaylar();
+  }
+  function menuKapat() { $("#menu-uygulamalar").hidden = true; $("#menu-hesap").hidden = true; $("#btn-uygulamalar").classList.remove("acik"); }
   const yuklemeler = new Map();   // yazıcı id → {yuzde, metin}
   function yukleKartHtml(y) {
     const c = y.canli || {}, d = c.durum || "cevrimdisi", yk = yuklemeler.get(y.id);
@@ -183,6 +209,7 @@
   }
   function cizHepsi() {
     gorunumUygula();
+    if (!MODUL_GORUNUM[st.modul]) { cizSayaclar(); cizGruplar(); return; }
     if (st.gorunum === "sade") { cizSade(); cizSayaclar(); cizGruplar(); sonucSayisi(); bosMu(); return; }
     if (st.gorunum === "yukle") { cizYukle(); cizSayaclar(); cizGruplar(); sonucSayisi(); bosMu(); return; }
     const kap = $("#kartlar");
@@ -192,7 +219,7 @@
     }).join("");
     cizSayaclar(); cizGruplar(); sonucSayisi(); bosMu();
   }
-  function bosMu() { $("#bos").hidden = st.yazicilar.size > 0; }
+  function bosMu() { $("#bos").hidden = st.yazicilar.size > 0 || st.modul !== "yazicilar"; }
   function sonucSayisi() { $("#sonuc-sayisi").textContent = `${filtreli().length} / ${st.yazicilar.size} yazıcı`; }
   function cizSayaclar() {
     const s = {}; DURUM_SIRA.forEach(d => s[d] = 0);
@@ -208,7 +235,7 @@
     sel.value = gruplar.includes(mevcut) ? mevcut : "";
   }
   function cizOlaylar() {
-    $("#olay-listesi").innerHTML = st.olaylar.slice(0, 100).map(o =>
+    $("#olay-listesi").innerHTML = st.olaylar.slice(0, 200).map(o =>
       `<li class="olay-${o.seviye}"><time>${saat(o.zaman)}</time>${kacis(o.mesaj)}</li>`).join("") || '<li class="ipucu">Henüz olay yok.</li>';
   }
 
@@ -355,7 +382,6 @@
   // ---------- Telegram bildirimleri ----------
   let tgAyar = null;
   async function bildirimAc() {
-    ac("ortu-bildirim");
     try { tgAyar = (await api("/api/ayarlar/telegram")).telegram; tgDoldur(); }
     catch (e) { bildir(e.message); }
   }
@@ -419,12 +445,10 @@
     } catch (err) { bildir(err.message, 6000); }
     finally { b.disabled = false; }
   });
-  $("#btn-bildirim").addEventListener("click", bildirimAc);
 
   // ---------- kullanıcılar ----------
   let roller = {};
   async function kullanicilarAc() {
-    ac("ortu-kullanicilar");
     try { const v = await api("/api/kullanicilar"); roller = v.roller; kullaniciTablo(v.kullanicilar); }
     catch (e) { bildir(e.message); }
   }
@@ -485,9 +509,8 @@
       ac("ortu-gecmis");
     } catch (e) { bildir(e.message); }
   }
-  $("#btn-kullanicilar").addEventListener("click", kullanicilarAc);
   $("#btn-tum-gecmis").addEventListener("click", () => gecmisAc(null));
-  $("#btn-parola").addEventListener("click", () => { $("#parola-form").reset(); ac("ortu-parola"); });
+  $("#btn-parola").addEventListener("click", () => { menuKapat(); $("#parola-form").reset(); ac("ortu-parola"); });
   $("#parola-form").addEventListener("submit", async (e) => {
     e.preventDefault(); const f = e.target;
     if (f.yeni.value !== f.yeni2.value) { bildir("Yeni parolalar eşleşmiyor"); return; }
@@ -539,12 +562,12 @@
     xhr.onerror = () => { yuklemeler.delete(id); cizKart(st.yazicilar.get(id)); bildir(`${y.ad}: yükleme sırasında ağ hatası`, 8000); };
     xhr.send(fd);
   }
-  $$("#gorunum-secici button").forEach(b => b.addEventListener("click", () => {
-    st.gorunum = b.dataset.gorunum;
-    try { localStorage.setItem("creamanage.gorunum", st.gorunum); } catch (e) { /* yok say */ }
-    cizHepsi();
-  }));
-  $("#sayaclar").addEventListener("click", (e) => { const s = e.target.closest(".sayac"); if (!s) return; $("#filtre-durum").value = s.dataset.d || ""; cizHepsi(); });
+  $$(".uyg[data-modul]").forEach(b => b.addEventListener("click", () => modulAc(b.dataset.modul)));
+  $("#btn-uygulamalar").addEventListener("click", (e) => { e.stopPropagation(); const m = $("#menu-uygulamalar"), acik = m.hidden; menuKapat(); m.hidden = !acik; $("#btn-uygulamalar").classList.toggle("acik", acik); });
+  $("#btn-avatar").addEventListener("click", (e) => { e.stopPropagation(); const m = $("#menu-hesap"), acik = m.hidden; menuKapat(); m.hidden = !acik; });
+  document.addEventListener("click", (e) => { if (!e.target.closest(".acilir")) menuKapat(); });
+  $("#sayaclar").addEventListener("click", (e) => { const s = e.target.closest(".sayac"); if (!s) return; $("#filtre-durum").value = s.dataset.d || ""; if (!MODUL_GORUNUM[st.modul]) modulAc("yazicilar"); else cizHepsi(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") menuKapat(); });
   ["#arama", "#filtre-durum", "#filtre-grup"].forEach(s => $(s).addEventListener("input", cizHepsi));
   $("#btn-sihirbaz").addEventListener("click", sihirbazAc);
   $("#btn-sihirbaz-2").addEventListener("click", sihirbazAc);

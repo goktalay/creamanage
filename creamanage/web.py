@@ -56,7 +56,7 @@ ACIK_YOLLAR = {"/giris", "/api/giris", "/api/kurulum", "/api/surum"}
 
 def gerekli_rol(yontem: str, yol: str) -> str:
     """Her istek için en düşük yeterli rol."""
-    if yol.startswith("/api/kullanicilar"):
+    if yol.startswith("/api/kullanicilar") or yol.startswith("/api/ayarlar"):
         return "sistem_yoneticisi"
     if yol in ("/api/cikis", "/api/ben", "/api/ben/parola"):
         return "gozetmen"

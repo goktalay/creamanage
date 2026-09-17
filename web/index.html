@@ -7,66 +7,135 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f5fbf'/%3E%3Ctext x='16' y='21' font-size='14' font-family='sans-serif' font-weight='700' fill='%23fff' text-anchor='middle'%3ECM%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/css/stil.css">
 </head>
-<body>
+<body class="uygulama">
+
 <header class="ust">
   <div class="marka">
     <span class="logo">CM</span>
     <div>
-      <h1>CreaManage <small class="alt">Yazıcı Filo Merkezi</small></h1>
-      <small>Gökkubbe Teknoloji Anonim Şirketi · <span id="surum"></span></small>
+      <h1>CreaManage</h1>
+      <small>Gökkubbe Teknoloji A.Ş. · <span id="surum"></span></small>
     </div>
   </div>
-  <div class="sayaclar" id="sayaclar"></div>
-  <div class="eylemler">
-    <span id="baglanti-rozeti" class="rozet rozet-kopuk">Sunucu bağlantısı yok</span>
-    <button class="btn" id="btn-kullanicilar" data-rol="sistem_yoneticisi" title="Kullanıcı yönetimi">Kullanıcılar</button>
-    <button class="btn" id="btn-bildirim" data-rol="yazici_yoneticisi" title="Telegram bildirim ayarları">Bildirimler</button>
-    <button class="btn btn-birincil" id="btn-sihirbaz" data-rol="yazici_yoneticisi">+ Yazıcı Ekle</button>
-    <span class="kullanici-cip" id="kullanici-cip"><b id="ben-ad"></b><span id="ben-rol"></span><button class="btn" id="btn-parola" title="Parolamı değiştir">Parola</button><button class="btn" id="btn-cikis">Çıkış</button></span>
+  <div class="ust-orta"><h2 class="modul-baslik" id="modul-baslik">Yazıcılar</h2></div>
+  <div class="ust-sag">
+    <button class="ikon-btn" id="btn-uygulamalar" title="Modüller" aria-label="Modüller" aria-haspopup="true">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><g fill="currentColor"><circle cx="5" cy="5" r="2.2"/><circle cx="12" cy="5" r="2.2"/><circle cx="19" cy="5" r="2.2"/><circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/><circle cx="5" cy="19" r="2.2"/><circle cx="12" cy="19" r="2.2"/><circle cx="19" cy="19" r="2.2"/></g></svg>
+    </button>
+    <div class="acilir uygulamalar" id="menu-uygulamalar" hidden>
+      <button class="uyg" data-modul="yazicilar"><span class="uyg-ikon">🖨️</span>Yazıcılar</button>
+      <button class="uyg" data-modul="dosya_listesi"><span class="uyg-ikon">📋</span>Dosya Listesi</button>
+      <button class="uyg" data-modul="dosya_yoneticisi" data-rol="gozetmen"><span class="uyg-ikon">📤</span>Dosya Yöneticisi</button>
+      <button class="uyg" data-modul="olaylar"><span class="uyg-ikon">🔔</span>Olaylar</button>
+      <button class="uyg" data-modul="bildirimler" data-rol="sistem_yoneticisi"><span class="uyg-ikon">✈️</span>Bildirimler</button>
+      <button class="uyg" data-modul="kullanicilar" data-rol="sistem_yoneticisi"><span class="uyg-ikon">👥</span>Kullanıcılar</button>
+    </div>
+    <button class="avatar-btn" id="btn-avatar" title="Hesap" aria-haspopup="true"><span class="avatar" id="avatar">?</span></button>
+    <div class="acilir hesap" id="menu-hesap" hidden>
+      <div class="hesap-bas"><span class="avatar buyuk" id="avatar-buyuk">?</span><div><b id="ben-ad"></b><br><small id="ben-rol"></small></div></div>
+      <button class="uyg" id="btn-parola">🔑 Parolamı değiştir</button>
+      <button class="uyg" id="btn-cikis">⏻ Çıkış yap</button>
+    </div>
   </div>
 </header>
 
 <main class="govde">
-  <section class="panel yazicilar">
-    <div class="arac-cubugu">
-      <input type="search" id="arama" placeholder="Ad, IP, dosya ara…">
-      <select id="filtre-durum">
-        <option value="">Tüm durumlar</option>
-        <option value="basiyor">Basıyor</option>
-        <option value="bosta">Boşta</option>
-        <option value="duraklatildi">Duraklatıldı</option>
-        <option value="tamamlandi">Tamamlandı</option>
-        <option value="hata">Hata</option>
-        <option value="hazirlaniyor">Hazırlanıyor</option>
-        <option value="cevrimdisi">Çevrimdışı</option>
-      </select>
-      <select id="filtre-grup"><option value="">Tüm gruplar</option></select>
-      <div class="secici" id="gorunum-secici" title="Görünüm">
-        <button type="button" data-gorunum="kart" class="aktif">Kartlar</button>
-        <button type="button" data-gorunum="sade">Sade</button>
-        <button type="button" data-gorunum="yukle">Yükle</button>
-      </div>
-      <span class="bosluk"></span>
-      <span class="ipucu" id="sonuc-sayisi"></span>
-    </div>
+
+  <!-- Yazıcı modülleri (Yazıcılar / Dosya Listesi / Dosya Yöneticisi) ortak araç çubuğu -->
+  <div class="arac-cubugu" id="yazici-arac">
+    <input type="search" id="arama" placeholder="Ad, IP, dosya ara…">
+    <select id="filtre-durum">
+      <option value="">Tüm durumlar</option>
+      <option value="basiyor">Basıyor</option>
+      <option value="bosta">Boşta</option>
+      <option value="duraklatildi">Duraklatıldı</option>
+      <option value="tamamlandi">Tamamlandı</option>
+      <option value="hata">Hata</option>
+      <option value="hazirlaniyor">Hazırlanıyor</option>
+      <option value="cevrimdisi">Çevrimdışı</option>
+    </select>
+    <select id="filtre-grup"><option value="">Tüm gruplar</option></select>
+    <span class="bosluk"></span>
+    <span class="ipucu" id="sonuc-sayisi"></span>
+    <button class="btn btn-birincil" id="btn-sihirbaz" data-rol="yazici_yoneticisi">+ Yazıcı Ekle</button>
+  </div>
+
+  <section class="modul" id="modul-yazicilar">
     <div class="kartlar" id="kartlar"></div>
-    <div class="yukle-kartlar" id="yukle" hidden></div>
-    <input type="file" id="dosya-secici" accept=".gcode,.gz,.gco,.g,.3mf" hidden>
-    <table class="sade" id="sade" hidden>
-      <thead><tr><th>Yazıcı</th><th>Dosya</th><th class="sag-hiza">İlerleme</th></tr></thead>
-      <tbody></tbody>
-    </table>
     <div class="bos" id="bos" hidden>
       <p>Henüz yazıcı yok.</p>
       <button class="btn btn-birincil" id="btn-sihirbaz-2" data-rol="yazici_yoneticisi">Ağı tarayıp yazıcı ekle</button>
     </div>
   </section>
 
-  <aside class="panel olaylar">
-    <h2>Olaylar</h2>
-    <ul id="olay-listesi"></ul>
-  </aside>
+  <section class="modul" id="modul-dosya_listesi" hidden>
+    <table class="sade" id="sade">
+      <thead><tr><th>Yazıcı</th><th>Dosya</th><th class="sag-hiza">İlerleme</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section class="modul" id="modul-dosya_yoneticisi" hidden>
+    <div class="yukle-kartlar" id="yukle"></div>
+    <input type="file" id="dosya-secici" accept=".gcode,.gz,.gco,.g,.3mf" hidden>
+  </section>
+
+  <section class="modul dar" id="modul-olaylar" hidden>
+    <ul id="olay-listesi" class="olaylar"></ul>
+  </section>
+
+  <section class="modul dar" id="modul-bildirimler" hidden>
+    <div class="panel">
+      <p class="ipucu">Telegram'da <b>@BotFather</b>'a <code>/newbot</code> yazıp bir bot oluşturun, verdiği belirteci aşağıya yapıştırın.
+        Bildirim alacak kişi (ya da grup) bota bir kez <code>/start</code> yazsın; sonra "Sohbetleri Bul" ile kimliği seçin.</p>
+      <form class="form" id="tg-form">
+        <label>Bot belirteci <input name="token" type="password" autocomplete="off" placeholder="123456789:AA…"><small class="ipucu" id="tg-token-durum"></small></label>
+        <div class="satir">
+          <label class="genis">Sohbet kimlikleri (virgülle) <input name="sohbetler" placeholder="123456789, -1001234567890"></label>
+          <button class="btn" type="button" id="tg-sohbet-bul">Sohbetleri Bul</button>
+        </div>
+        <div id="tg-sohbet-liste" class="secenekler kucuk-liste"></div>
+        <fieldset class="olay-secim">
+          <legend>Hangi olaylarda bildirim gönderilsin?</legend>
+          <div id="tg-olaylar"></div>
+        </fieldset>
+        <label class="satir"><input name="etkin" type="checkbox"> Telegram bildirimleri etkin</label>
+        <div class="satir">
+          <button class="btn btn-birincil" type="submit">Kaydet</button>
+          <button class="btn" type="button" id="tg-test">Test Mesajı Gönder</button>
+          <span class="ipucu" id="tg-durum"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="modul" id="modul-kullanicilar" hidden>
+    <div class="panel">
+      <div class="satir arada">
+        <p class="ipucu"><b>Sistem Yöneticisi</b> her şeyi yapar. <b>Yazıcı Yöneticisi</b> kullanıcı yönetimi dışında her şeyi yapar. <b>Gözetmen</b> yalnız izler.</p>
+        <button class="btn" id="btn-tum-gecmis">Tüm İşlem Geçmişi</button>
+      </div>
+      <table class="tablo" id="kullanici-tablo">
+        <thead><tr><th>Kullanıcı adı</th><th>Personel adı</th><th>Rol</th><th>Etkin</th><th>Son giriş</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <h3>Yeni kullanıcı</h3>
+      <form class="yeni-kullanici" id="yeni-kullanici">
+        <label>Kullanıcı adı <input name="kullanici_adi" required pattern="[a-zA-Z0-9._\-]{3,32}"></label>
+        <label>Personel adı <input name="ad"></label>
+        <label>Rol <select name="rol"><option value="gozetmen">Gözetmen</option><option value="yazici_yoneticisi">Yazıcı Yöneticisi</option><option value="sistem_yoneticisi">Sistem Yöneticisi</option></select></label>
+        <label>Parola <input name="parola" type="password" required minlength="8" autocomplete="new-password"></label>
+        <button class="btn btn-birincil" type="submit">Ekle</button>
+      </form>
+    </div>
+  </section>
 </main>
+
+<footer class="alt">
+  <div class="sayaclar" id="sayaclar"></div>
+  <span class="bosluk"></span>
+  <span id="baglanti-rozeti" class="rozet rozet-kopuk">Sunucu bağlantısı yok</span>
+</footer>
 
 <!-- Yazıcı ayrıntı paneli -->
 <div class="ortu" id="ortu-ayrinti" hidden>
@@ -119,7 +188,6 @@
       <li data-adim="2">Tara</li>
       <li data-adim="3">Seç ve ekle</li>
     </ol>
-
     <section class="adim" data-adim="1">
       <p>Yazıcıların bulunduğu alt ağı seçin. Tarama, her adreste <code>9999</code> portunu yoklar ve yanıt verenlere kimlik sorar. Ağa yalnız durum sorgusu gönderilir, yazıcı ayarları değişmez.</p>
       <div id="ag-listesi" class="secenekler"></div>
@@ -135,7 +203,6 @@
       </details>
       <div class="satir sag"><button class="btn btn-birincil" id="btn-tara">Taramayı Başlat</button></div>
     </section>
-
     <section class="adim" data-adim="2" hidden>
       <p id="tarama-metin">Taranıyor…</p>
       <progress id="tarama-cubuk" max="100" value="0"></progress>
@@ -145,7 +212,6 @@
         <button class="btn btn-birincil" id="btn-tarama-ileri" disabled>Sonuçlara Geç</button>
       </div>
     </section>
-
     <section class="adim" data-adim="3" hidden>
       <p id="sonuc-metin"></p>
       <table class="tablo" id="sonuc-tablo">
@@ -157,58 +223,6 @@
         <button class="btn btn-birincil" id="btn-ekle">Seçilenleri Ekle</button>
       </div>
     </section>
-  </div>
-</div>
-
-<!-- Bildirim ayarları -->
-<div class="ortu" id="ortu-bildirim" hidden>
-  <div class="modal">
-    <div class="modal-baslik">
-      <h2>Telegram Bildirimleri</h2>
-      <button class="btn btn-ikincil" data-kapat="ortu-bildirim">Kapat</button>
-    </div>
-    <p class="ipucu">Telegram'da <b>@BotFather</b>'a <code>/newbot</code> yazıp bir bot oluşturun, verdiği belirteci aşağıya yapıştırın.
-      Bildirim alacak kişi (ya da grup) bota bir kez <code>/start</code> yazsın; sonra "Sohbetleri Bul" ile kimliği seçin.</p>
-    <form class="form" id="tg-form">
-      <label>Bot belirteci <input name="token" type="password" autocomplete="off" placeholder="123456789:AA…"><small class="ipucu" id="tg-token-durum"></small></label>
-      <div class="satir">
-        <label class="genis">Sohbet kimlikleri (virgülle) <input name="sohbetler" placeholder="123456789, -1001234567890"></label>
-        <button class="btn" type="button" id="tg-sohbet-bul">Sohbetleri Bul</button>
-      </div>
-      <div id="tg-sohbet-liste" class="secenekler kucuk-liste"></div>
-      <fieldset class="olay-secim">
-        <legend>Hangi olaylarda bildirim gönderilsin?</legend>
-        <div id="tg-olaylar"></div>
-      </fieldset>
-      <label class="satir"><input name="etkin" type="checkbox"> Telegram bildirimleri etkin</label>
-      <div class="satir">
-        <button class="btn btn-birincil" type="submit">Kaydet</button>
-        <button class="btn" type="button" id="tg-test">Test Mesajı Gönder</button>
-        <span class="ipucu" id="tg-durum"></span>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Kullanıcı yönetimi -->
-<div class="ortu" id="ortu-kullanicilar" hidden>
-  <div class="modal genis">
-    <div class="modal-baslik">
-      <h2>Kullanıcılar</h2>
-      <div class="satir"><button class="btn" id="btn-tum-gecmis">Tüm İşlem Geçmişi</button><button class="btn btn-ikincil" data-kapat="ortu-kullanicilar">Kapat</button></div>
-    </div>
-    <p class="ipucu"><b>Sistem Yöneticisi</b> her şeyi yapar. <b>Yazıcı Yöneticisi</b> kullanıcı yönetimi dışında her şeyi yapar (yazıcı ekleme, komut, tarama, bildirim ayarları, dosya yükleme). <b>Gözetmen</b> yalnız izler.</p>
-    <table class="tablo" id="kullanici-tablo">
-      <thead><tr><th>Kullanıcı adı</th><th>Personel adı</th><th>Rol</th><th>Etkin</th><th>Son giriş</th><th></th></tr></thead>
-      <tbody></tbody>
-    </table>
-    <form class="yeni-kullanici" id="yeni-kullanici">
-      <label>Kullanıcı adı <input name="kullanici_adi" required pattern="[a-zA-Z0-9._\-]{3,32}"></label>
-      <label>Personel adı <input name="ad"></label>
-      <label>Rol <select name="rol"><option value="gozetmen">Gözetmen</option><option value="yazici_yoneticisi">Yazıcı Yöneticisi</option><option value="sistem_yoneticisi">Sistem Yöneticisi</option></select></label>
-      <label>Parola <input name="parola" type="password" required minlength="8" autocomplete="new-password"></label>
-      <button class="btn btn-birincil" type="submit">Ekle</button>
-    </form>
   </div>
 </div>
 

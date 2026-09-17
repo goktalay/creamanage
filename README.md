@@ -9,9 +9,9 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
 ## Sürüm 0.4.0 — ne yapar
 
 - **Kullanıcı girişi ve roller:** herkes kullanıcı adı ve parola ile girer. Üç rol:
-  **Sistem Yöneticisi** (her şey + kullanıcı yönetimi ve işlem geçmişi), **Yazıcı Yöneticisi**
-  (kullanıcı yönetimi dışında her şey: yazıcı ekleme/silme, komutlar, tarama, bildirim
-  ayarları, dosya yükleme), **Gözetmen** (yalnız izler). Rol denetimi her API ucunda
+  **Sistem Yöneticisi** (her şey + kullanıcı yönetimi, işlem geçmişi, bildirim ayarları),
+  **Yazıcı Yöneticisi** (yazıcı ekleme/silme, komutlar, tarama, dosya yükleme),
+  **Gözetmen** (yalnız izler). Rol denetimi her API ucunda
   sunucu tarafında yapılır; arayüz yalnız yetkili düğmeleri gösterir.
 - **İşlem geçmişi (denetim kaydı):** her kullanıcının yaptığı her değişiklik kaydedilir:
   giriş/çıkış/başarısız giriş, komutlar (durdur/başlat/iptal; hangi yazıcı, hangi dosya),
@@ -25,6 +25,10 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
 - **Ağ tarama sihirbazı:** makinedeki alt ağları listeler, seçilen CIDR'da 9999 portunu
   paralel yoklar, yanıt verenlere WebSocket ile kimlik (hostname, model) sorar; bulunanları
   ad ve grup vererek toplu ekler. Elle IP ile ekleme de vardır.
+- **Arayüz düzeni:** sabit üst çubuk (logo, modül menüsü, kullanıcı avatarı), ortada
+  kaydırılan modül alanı, sabit alt çubukta durum sayaçları. Modüller: Yazıcılar (kartlar),
+  Dosya Listesi (satırlar), Dosya Yöneticisi (yükle ve yazdır), Olaylar; sistem yöneticisine
+  ek olarak Bildirimler ve Kullanıcılar.
 - **Canlı gösterge paneli:** her yazıcı için durum (basıyor / boşta / duraklatıldı /
   tamamlandı / hata / hazırlanıyor / çevrimdışı), dosya, ilerleme, katman, kalan süre,
   nozul/tabla/kabin sıcaklıkları. Durum sayaçları, arama, durum ve grup filtresi.
@@ -76,7 +80,7 @@ olmalıdır. Tarama için alt ağ en fazla /20 (4096 adres) olabilir.
    (`123456789:AA…`) kopyalayın.
 2. Bildirim alacak kişi bota bir kez `/start` yazsın. Grup için botu gruba ekleyin ve
    grupta bir mesaj yazın.
-3. CreaManage'de sağ üstte **Bildirimler** → belirteci yapıştırın → **Sohbetleri Bul** →
+3. CreaManage'de uygulama menüsünden **Bildirimler** (sistem yöneticisi) → belirteci yapıştırın → **Sohbetleri Bul** →
    listeden kişiyi/grubu işaretleyin → hangi olaylarda bildirim istediğinizi seçin →
    **Telegram bildirimleri etkin** → **Kaydet**. **Test Mesajı Gönder** ile doğrulayın.
 

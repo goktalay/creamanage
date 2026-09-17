@@ -30,7 +30,8 @@ class HashTesti(unittest.TestCase):
         self.assertEqual(gerekli_rol("GET", "/api/yazicilar"), "gozetmen")
         self.assertEqual(gerekli_rol("POST", "/api/yazicilar"), "yazici_yoneticisi")
         self.assertEqual(gerekli_rol("POST", "/api/yazicilar/3/komut"), "yazici_yoneticisi")
-        self.assertEqual(gerekli_rol("PUT", "/api/ayarlar/telegram"), "yazici_yoneticisi")
+        self.assertEqual(gerekli_rol("PUT", "/api/ayarlar/telegram"), "sistem_yoneticisi")
+        self.assertEqual(gerekli_rol("GET", "/api/ayarlar/telegram"), "sistem_yoneticisi")
         self.assertEqual(gerekli_rol("GET", "/api/kullanicilar"), "sistem_yoneticisi")
         self.assertEqual(gerekli_rol("DELETE", "/api/kullanicilar/2"), "sistem_yoneticisi")
         self.assertEqual(gerekli_rol("PUT", "/api/ben/parola"), "gozetmen")
@@ -151,7 +152,8 @@ class ApiTesti(unittest.IsolatedAsyncioTestCase):
         r = await goz.get("/api/yazicilar"); self.assertEqual(r.status, 200)
         r = await goz.post("/api/yazicilar", json={"ad": "x", "ip": "127.0.0.9"}); self.assertEqual(r.status, 403)
         r = await goz.post("/api/tarama", json={"cidr": "127.0.0.0/30"}); self.assertEqual(r.status, 403)
-        r = await goz.get("/api/ayarlar/telegram"); self.assertEqual(r.status, 404)   # okuma serbest; telegram kanalı yok → 404
+        r = await goz.get("/api/ayarlar/telegram"); self.assertEqual(r.status, 403)   # bildirim ayarları yalnız sistem yöneticisi
+        r = await yy.get("/api/ayarlar/telegram"); self.assertEqual(r.status, 403)
         r = await goz.get("/api/kullanicilar"); self.assertEqual(r.status, 403)
         ws = await goz.ws_connect("/ws"); self.assertEqual((await ws.receive_json())["tur"], "anlik"); await ws.close()
         # Yazıcı yöneticisi: yazıcı işleri serbest, kullanıcı yönetimi yasak
