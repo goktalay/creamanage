@@ -52,6 +52,14 @@ olmalıdır. Tarama için alt ağ en fazla /20 (4096 adres) olabilir.
    listeden kişiyi/grubu işaretleyin → hangi olaylarda bildirim istediğinizi seçin →
    **Telegram bildirimleri etkin** → **Kaydet**. **Test Mesajı Gönder** ile doğrulayın.
 
+"Sohbetleri Bul" sonuç vermezse sunucuda tanı aracını çalıştırın; internet, belirteç,
+webhook ve bota gelen mesajları adım adım gösterir, sohbet kimliğini yazdırır:
+
+```bash
+python3 araclar/telegram_tani.py <BOT_BELIRTECI>
+python3 araclar/telegram_tani.py <BOT_BELIRTECI> --gonder <SOHBET_ID>   # test mesajı
+```
+
 Belirteç yalnız sunucudaki `creamanage.sqlite` içinde tutulur; arayüze maskelenmiş döner.
 Sunucunun `api.telegram.org` adresine internet erişimi olmalıdır (yazıcı ağı kapalıysa
 sunucuya ikinci bir ağ bağlantısı ya da vekil gerekir).
