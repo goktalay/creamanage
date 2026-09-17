@@ -6,12 +6,12 @@ Creality **K2 Plus (Combo)** 3D yazıcı filosunu (hedef: 56 cihaz) yerel ağ ü
 Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sunduğu
 **WebSocket 9999** arayüzü kullanılır (root, Moonraker, bulut yok). Garanti korunur.
 
-## Sürüm 0.6.0 — ne yapar
+## Sürüm 0.7.0 — ne yapar
 
 - **Kullanıcı girişi ve roller:** herkes kullanıcı adı ve parola ile girer. Üç rol:
-  **Sistem Yöneticisi** (her şey + kullanıcı yönetimi, işlem geçmişi, bildirim ayarları),
-  **Yazıcı Yöneticisi** (yazıcı ekleme/silme, komutlar, tarama, dosya yükleme),
-  **Gözetmen** (yalnız izler). Rol denetimi her API ucunda
+  **Sistem Yöneticisi** (her şey: yazıcı ekleme/silme/ayarları, ağ tarama, kullanıcılar,
+  işlem geçmişi, bildirim ayarları, hata kodu tablosu), **Yazıcı Yöneticisi** (komutlar,
+  dosya yükleme ve yazdırma), **Gözetmen** (yalnız izler). Rol denetimi her API ucunda
   sunucu tarafında yapılır; arayüz yalnız yetkili düğmeleri gösterir.
 - **İşlem geçmişi (denetim kaydı):** her kullanıcının yaptığı her değişiklik kaydedilir:
   giriş/çıkış/başarısız giriş, komutlar (durdur/başlat/iptal; hangi yazıcı, hangi dosya),
@@ -45,6 +45,13 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
 - **Sistem dışı müdahale = MAJÖR olay:** baskı, CreaManage üzerinden komut verilmeden
   (yazıcı ekranından) durdurulur ya da iptal edilirse `dis_mudahale` olayı üretilir; yalnız
   sistem yöneticileri görür ve Telegram'da yalnız "yönetici kanalı" sohbetlerine gider.
+- **Geçmiş grafikleri:** ayrıntı penceresinde sıcaklık (nozul, tabla, kabin ve hedefleri) ve
+  ilerleme grafikleri; ayrı eksenli iki grafik, kesişim çizgili ipucu, klavye ile gezinme,
+  açık/koyu tema için doğrulanmış renkler; altındaki tablo ve CSV aynı veriyi verir.
+- **Hata kodu tablosu yönetimi (sistem yöneticisi):** "Hata Kodları" modülünde arama,
+  düzenleme, ekleme, silme; CSV/JSON/HTML dosyasından içe aktarma.
+- **Yenileme aralığı:** alt çubukta 1 sn / 3 sn / 5 sn / 10 sn / 1 dk; yazıcı ekranları
+  seçilen aralıkta yenilenir, tercih kullanıcı hesabına kaydedilir.
 - **Gece / gündüz teması:** üst çubuktaki güneş/ay düğmesiyle; tercih kullanıcı hesabına
   kaydedilir (her cihazda aynı), seçilmemişse işletim sistemi teması izlenir.
 - **Yazıcı ayrıntısı:** ikonlu bilgi kartları (dosya, ilerleme, süreler, sıcaklıklar, fan,
@@ -178,7 +185,7 @@ testler/           birim ve uçtan uca testler
 | `GET/PUT/DELETE /api/yazicilar/{id}` | ayrıntı (+ham, +olaylar) / güncelle / sil |
 | `GET /api/yazicilar/{id}/telemetri?baslangic=&bitis=&adim=&limit=` | telemetri örnekleri (adim: seyreltme sn) |
 | `GET /api/yazicilar/{id}/degisimler`, `GET /api/yazicilar/{id}/hatalar` | değişim ve hata geçmişi |
-| `GET /api/hata_kodlari` | hata kodu tablosu |
+| `GET /api/hata_kodlari`, `PUT/DELETE /api/hata_kodlari/{kod}`, `POST /api/hata_kodlari/ice_aktar` | hata kodu tablosu (yazma: sistem yöneticisi) |
 | `POST /api/yazicilar/{id}/dosya` | multipart `file` (+`baslat`=1/0): yükle ve yazdır (yazıcı yöneticisi) |
 | `POST /api/yazicilar/{id}/komut` | `{komut: duraklat\|surdur\|durdur\|isik\|nozul\|tabla\|fan, deger?}` |
 | `GET /api/aglar` | makinedeki alt ağlar |

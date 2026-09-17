@@ -59,6 +59,9 @@ class YuklemeTesti(unittest.IsolatedAsyncioTestCase):
         self.client = TestClient(TestServer(uygulama_olustur(self.filo))); await self.client.start_server()
         KullaniciYonetimi(self.vt).ekle("yon", "Yön.", "yazici_yoneticisi", "testparola123")
         KullaniciYonetimi(self.vt).ekle("goz", "Göz.", "gozetmen", "testparola123")
+        KullaniciYonetimi(self.vt).ekle("admin", "A", "sistem_yoneticisi", "testparola123")
+        self.admin = TestClient(TestServer(self.client.server.app)); await self.admin.start_server(); self.addAsyncCleanup(self.admin.close)
+        r = await self.admin.post("/api/giris", json={"kullanici_adi": "admin", "parola": "testparola123"}); assert r.status == 200
         r = await self.client.post("/api/giris", json={"kullanici_adi": "yon", "parola": "testparola123"}); assert r.status == 200
         self.gcode = Path(self.tmp.name) / "Kapak v2.gcode"
         self.gcode.write_bytes(b"; test gcode\nG28\n" * 5000)
@@ -78,7 +81,7 @@ class YuklemeTesti(unittest.IsolatedAsyncioTestCase):
             await Y.dosya_yukle("127.0.0.2", "x.gcode", self.gcode, port=PORT + 1, zaman_asimi=5)   # yanlış port, 80/4408 de kapalı
 
     async def test_api_yukle_ve_baslat(self):
-        r = await self.client.post("/api/yazicilar", json={"ad": "Y1", "ip": "127.0.0.2", "port": PORT, "http_port": PORT})
+        r = await self.admin.post("/api/yazicilar", json={"ad": "Y1", "ip": "127.0.0.2", "port": PORT, "http_port": PORT})
         yid = (await r.json())["yazici"]["id"]
         self.assertTrue(await bekle(lambda: self.filo.yazici_gorunum(yid)["canli"]["baglanti"] == "bagli"))
         # Yanlış uzantı reddedilir
@@ -109,7 +112,7 @@ class YuklemeTesti(unittest.IsolatedAsyncioTestCase):
         r = await goz.post(f"/api/yazicilar/{yid}/dosya", data=fd); self.assertEqual(r.status, 403)
 
     async def test_yazici_kapaliysa_502(self):
-        r = await self.client.post("/api/yazicilar", json={"ad": "Yok", "ip": "127.0.0.9", "port": PORT, "http_port": PORT})
+        r = await self.admin.post("/api/yazicilar", json={"ad": "Yok", "ip": "127.0.0.9", "port": PORT, "http_port": PORT})
         yid = (await r.json())["yazici"]["id"]
         fd = aiohttp.FormData(); fd.add_field("file", b"G28\n", filename="c.gcode")
         r = await self.client.post(f"/api/yazicilar/{yid}/dosya", data=fd); self.assertEqual(r.status, 502)

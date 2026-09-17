@@ -1,27 +1,273 @@
 {
  "_aciklama": "Creality K2 Plus hata kodu tablosu (Creality Cloud yardım merkezi, Türkçe). Anahtar: sayısal kod; yazıcının err.key/err.errcode alanıyla eşleşir. Harf öneki modülü gösterir (ör. CY2586: Kontrolör/Y ekseni). araclar/hata_kodlari_al.py ile güncellenebilir.",
  "_kaynak": "Creality Cloud hata kodu özeti (TR) + Creality Excel tablosu (CFS kodları Türkçeye çevrildi)",
- "_guncelleme": "2026-09-17 10:59",
+ "_guncelleme": "2026-09-17 11:08",
  "kodlar": {
+  "101": {
+   "tam_kod": "AC0101",
+   "baslik": "AI: baskı kalitesi sorunu (spagetti) algılandı, baskı duraklatıldı",
+   "aciklama": "",
+   "cozum": "Baskıyı kontrol edin. Yanlış alarm sıksa AI hassasiyetini normale alın ya da AI'yi kapatın.",
+   "modul": "AI algılama / kamera"
+  },
+  "103": {
+   "tam_kod": "AC0103",
+   "baslik": "AI: ilk katman baskı kalitesi sorunu, baskı duraklatıldı",
+   "aciklama": "",
+   "cozum": "Yapıştırıcı/özel plaka deseni yanlış algılanabilir. Yanlış alarm sıksa hassasiyeti normale alın ya da AI'yi kapatın.",
+   "modul": "AI algılama / kamera"
+  },
+  "104": {
+   "tam_kod": "AC0104",
+   "baslik": "AI: baskı plakasında yabancı cisim algılandı, baskı duraklatıldı",
+   "aciklama": "",
+   "cozum": "Plakayı temizleyin. Yanlış alarmsa Yeniden Dene'ye basın.",
+   "modul": "AI algılama / kamera"
+  },
+  "110": {
+   "tam_kod": "BM0110",
+   "baslik": "Anakart bağlantı arızası",
+   "aciklama": "",
+   "cozum": "Anakart kabloları anormal ya da anakart hasarlı.",
+   "modul": "Devre kartı"
+  },
+  "111": {
+   "tam_kod": "BM0111",
+   "baslik": "Nozul (sıcak uç kartı) bağlantısı anormal",
+   "aciklama": "",
+   "cozum": "Sıcak uç devre kartı kablolarını kontrol edip yeniden takın; kart hasarlıysa değiştirin.",
+   "modul": "Devre kartı"
+  },
+  "112": {
+   "tam_kod": "BM0112",
+   "baslik": "Sıcak yatak kartı bağlantısı anormal",
+   "aciklama": "",
+   "cozum": "Sıcak yatak devre kartı kablolarını kontrol edip yeniden takın; kart hasarlıysa değiştirin.",
+   "modul": "Devre kartı"
+  },
+  "115": {
+   "tam_kod": "CM0115",
+   "baslik": "Bitmemiş görev algılandı, yazdırmaya devam edilsin mi",
+   "aciklama": "",
+   "cozum": "Baskı sırasında güç kesildi, güç kaybı kurtarma tetiklendi. Parça yarıyı geçtiyse devam edin; az basıldıysa yeniden başlatın.",
+   "modul": "Kontrolör / motor"
+  },
+  "116": {
+   "tam_kod": "TR0116",
+   "baslik": "Filament bitti, baskı duraklatıldı",
+   "aciklama": "",
+   "cozum": "Ekrandaki filament değiştirme adımlarını izleyip filament yükleyin ve devam edin. Yanlış tetikleniyorsa filament sensörünü değiştirin.",
+   "modul": "Alet kiti / filament"
+  },
+  "117": {
+   "tam_kod": "AC0117",
+   "baslik": "AI: model çarpılması tespit edildi, baskı duraklatıldı",
+   "aciklama": "",
+   "cozum": "Baskıyı kontrol edin. Yanlış alarmsa AI hassasiyetini normale alın ya da AI'yi kapatın.",
+   "modul": "AI algılama / kamera"
+  },
+  "120": {
+   "tam_kod": "CA0120",
+   "baslik": "Kayış gerginliği anormal",
+   "aciklama": "",
+   "cozum": "Kayış gerginliği düşük. Ayarlar → Kendi Kendini Test → Titreşim Optimizasyonu (Input Shaping) çalıştırıp sonra yazdırın.",
+   "modul": "Kayış gerginliği"
+  },
+  "123": {
+   "tam_kod": "AC0123",
+   "baslik": "AI: baskı plakası eksik, baskı duraklatıldı",
+   "aciklama": "",
+   "cozum": "Plakayı yerleştirin. Yanlış alarmsa Yeniden Dene'ye basın.",
+   "modul": "AI algılama / kamera"
+  },
+  "124": {
+   "tam_kod": "AC0124",
+   "baslik": "AI: baskı plakası eksik ve/veya yabancı cisim var, baskı duraklatıldı",
+   "aciklama": "",
+   "cozum": "Plakayı yerleştirin/temizleyin. Yanlış alarmsa Yeniden Dene'ye basın.",
+   "modul": "AI algılama / kamera"
+  },
+  "500": {
+   "tam_kod": "AC0500",
+   "baslik": "AI: baskı kalitesi sorunu tespit edildi",
+   "aciklama": "",
+   "cozum": "Devam edilebilecekse ekrandan/dilimleyiciden/Cloud'dan devam edin; başarısızsa temizleyip yeniden başlatın. Sistem Ayarları → Kamera → AI'den kapatılabilir.",
+   "modul": "AI algılama / kamera"
+  },
+  "501": {
+   "tam_kod": "TF0501",
+   "baslik": "Isı kesme (heatbreak) fan hızı çok düşük",
+   "aciklama": "",
+   "cozum": "1) Fan kablo terminalini yeniden takın. 2) Fan vidalarla sıkışmış olabilir. 3) Fan hasarlıysa değiştirin.",
+   "modul": "Alet kiti / fan"
+  },
+  "503": {
+   "tam_kod": "AC0503",
+   "baslik": "AI: ilk katman baskı kalitesi sorunu",
+   "aciklama": "",
+   "cozum": "Devam edilebilecekse ekrandan devam edin; başarısızsa temizleyip yeniden yazdırın. AI işlevi kapatılabilir.",
+   "modul": "AI algılama / kamera"
+  },
+  "504": {
+   "tam_kod": "AC0504",
+   "baslik": "Dosya otomatik PA kalibrasyonunu desteklemiyor, varsayılanla yazdırılıyor",
+   "aciklama": "",
+   "cozum": "Firmware 1.3.3.0+ ve güncel CrealityPrint/Orca/Prusa dilimleyici kullanın.",
+   "modul": "AI algılama / kamera"
+  },
+  "505": {
+   "tam_kod": "AL0505",
+   "baslik": "AI LiDAR anomalisi",
+   "aciklama": "",
+   "cozum": "1) LiDAR kablo bağlantılarını kontrol edin. 2) LiDAR'ı değiştirin.",
+   "modul": "AI LiDAR"
+  },
+  "506": {
+   "tam_kod": "AL0506",
+   "baslik": "AI LiDAR kalibrasyon hatası",
+   "aciklama": "",
+   "cozum": "1) LiDAR kamerasını silip yeniden deneyin. 2) Etiketler kirli/okunamıyorsa değiştirin.",
+   "modul": "AI LiDAR"
+  },
+  "507": {
+   "tam_kod": "AL0507",
+   "baslik": "AI LiDAR hizalama hatası",
+   "aciklama": "",
+   "cozum": "1) LiDAR kamerası kirli olabilir. 2) Kalibrasyon modeli basılamıyor ya da gereksinimi karşılamıyor.",
+   "modul": "AI LiDAR"
+  },
+  "508": {
+   "tam_kod": "BS0508",
+   "baslik": "Depolama alanı doluyor",
+   "aciklama": "",
+   "cozum": "Boş alan azaldı: gereksiz G-code ve hızlandırılmış kamera dosyalarını silin.",
+   "modul": "Depolama"
+  },
+  "509": {
+   "tam_kod": "AC0509",
+   "baslik": "Hazne sıcaklığı çok yüksek, kamera kapatıldı",
+   "aciklama": "",
+   "cozum": "Kamerayı korumak için; hazne 50 °C altına inince otomatik açılır.",
+   "modul": "AI algılama / kamera"
+  },
+  "510": {
+   "tam_kod": "AC0510",
+   "baslik": "Kamera başlatılamadı",
+   "aciklama": "",
+   "cozum": "Yazılım çökmesi ya da gevşek kamera bağlantısı; yeniden başlatın.",
+   "modul": "AI algılama / kamera"
+  },
+  "511": {
+   "tam_kod": "AC0511",
+   "baslik": "Dosya akış oranı kalibrasyonunu desteklemiyor, varsayılanla yazdırılıyor",
+   "aciklama": "",
+   "cozum": "Dosya Creality Print 5 dışı bir dilimleyiciden olabilir.",
+   "modul": "AI algılama / kamera"
+  },
+  "512": {
+   "tam_kod": "AC0512",
+   "baslik": "Akış oranı kalibrasyonu başarısız, varsayılanla yazdırılıyor",
+   "aciklama": "",
+   "cozum": "Kamera tanımlama hatası ya da değer aralık dışı olabilir.",
+   "modul": "AI algılama / kamera"
+  },
+  "513": {
+   "tam_kod": "AC0513",
+   "baslik": "Otomatik PA kalibrasyon görüntü anomalisi, varsayılanla yazdırılıyor",
+   "aciklama": "",
+   "cozum": "Kamera görüntüsü kullanılamadı; kamerayı/aydınlatmayı kontrol edin.",
+   "modul": "AI algılama / kamera"
+  },
+  "514": {
+   "tam_kod": "AC0514",
+   "baslik": "Otomatik PA kalibrasyonu başarısız, varsayılanla yazdırılıyor",
+   "aciklama": "",
+   "cozum": "Kamera tanımlama hatası, değer aralık dışı ya da kalibrasyon deseni kalitesiz olabilir.",
+   "modul": "AI algılama / kamera"
+  },
+  "515": {
+   "tam_kod": "AC0515",
+   "baslik": "Akış oranı kalibrasyon görüntü anomalisi, varsayılanla yazdırılıyor",
+   "aciklama": "",
+   "cozum": "Kamera görüntüsü kullanılamadı.",
+   "modul": "AI algılama / kamera"
+  },
+  "516": {
+   "tam_kod": "AC0516",
+   "baslik": "Akış oranı kalibrasyonu başarısız, varsayılanla yazdırılıyor",
+   "aciklama": "",
+   "cozum": "Kamera tanımlama hatası ya da değer aralık dışı olabilir.",
+   "modul": "AI algılama / kamera"
+  },
+  "523": {
+   "tam_kod": "AC0523",
+   "baslik": "AI: model çarpılması (warping) tespit edildi",
+   "aciklama": "",
+   "cozum": "Yanlış alarmsa AI hassasiyetini normale alın ya da AI'yi kapatın.",
+   "modul": "AI algılama / kamera"
+  },
+  "526": {
+   "tam_kod": "TF0526",
+   "baslik": "Model fan hızı çok düşük",
+   "aciklama": "",
+   "cozum": "Fan hızı ayarlanan değerin altında; kablo ve fanın sıkışıp sıkışmadığını kontrol edin.",
+   "modul": "Alet kiti / fan"
+  },
+  "2000": {
+   "tam_kod": "XS2000",
+   "baslik": "Sistem hatası, yeniden başlatın",
+   "aciklama": "",
+   "cozum": "Sistem çöktü; kapatıp açın. Sürerse günlükleri cs@creality.com adresine iletin.",
+   "modul": "Sistem"
+  },
+  "2001": {
+   "tam_kod": "XS2001",
+   "baslik": "Sistem hatası, yeniden başlatın",
+   "aciklama": "",
+   "cozum": "Sistem çöktü; kapatıp açın. Sürerse günlükleri cs@creality.com adresine iletin.",
+   "modul": "Sistem"
+  },
+  "2060": {
+   "tam_kod": "XS2060",
+   "baslik": "Sistem hatası, yeniden başlatın",
+   "aciklama": "",
+   "cozum": "Sistem çöktü; kapatıp açın. Sürerse günlükleri cs@creality.com adresine iletin.",
+   "modul": "Sistem"
+  },
+  "2070": {
+   "tam_kod": "CA2070",
+   "baslik": "Kayış gerdirme hatası",
+   "aciklama": "Otomatik kayış gerdirme işlemi başarısız oldu.",
+   "cozum": "Gerdirme modülünün sıkışıp sıkışmadığını ve kayışların yerinde olduğunu kontrol edin; Ayarlar → Kendi Kendini Test → Titreşim Optimizasyonu'nu yeniden çalıştırın.",
+   "modul": "Kayış gerginliği",
+   "yazicilar": "K2 Plus"
+  },
+  "2093": {
+   "tam_kod": "XS2093",
+   "baslik": "Sistem hatası, yeniden başlatın",
+   "aciklama": "",
+   "cozum": "Sistem çöktü; kapatıp açın. Sürerse günlükleri cs@creality.com adresine iletin.",
+   "modul": "Sistem"
+  },
+  "2111": {
+   "tam_kod": "TE2111",
+   "baslik": "Nozul sıcaklığı minimum ekstrüzyon sıcaklığının altında",
+   "aciklama": "",
+   "cozum": "Ekstrüzyon sıcaklığı yapılandırma minimumunun (170 °C) altında. Resmi dilimleyici kullanın; sıcak uç hasarlıysa ısıtma hatalarına bakın.",
+   "modul": "Alet kiti / nozul"
+  },
+  "2509": {
+   "tam_kod": "TE2509",
+   "baslik": "Nozul sıcaklığı okunamıyor, termistör bağlantısı kesik olabilir",
+   "aciklama": "",
+   "cozum": "1) Sıcak uç termistör kablosunu kontrol edin, yeniden takın. 2) Termistör/sıcak uç hasarlıysa değiştirin.",
+   "modul": "Alet kiti / nozul"
+  },
   "2510": {
    "tam_kod": "CB2510",
    "baslik": "Sıcak yatak termistörü açık devre",
    "aciklama": "",
    "cozum": "1) Termistör kablo bağlantısını kontrol edin, yeniden takın. 2) Termistör içten hasarlıysa değiştirin.",
-   "modul": "Kontrolör / sıcak yatak"
-  },
-  "2516": {
-   "tam_kod": "CB2516",
-   "baslik": "Sıcak yatak termistörü kısa devre",
-   "aciklama": "",
-   "cozum": "1) Termistör kablosu kopmuş ve kısa devre yapmış olabilir; hasarlı parçayı onarın. 2) Termistör içten hasarlıysa değiştirin.",
-   "modul": "Kontrolör / sıcak yatak"
-  },
-  "2565": {
-   "tam_kod": "CB2565",
-   "baslik": "Isı yatağı beklendiği gibi ısınmıyor",
-   "aciklama": "",
-   "cozum": "Kapsamlı hata: sıcak yatak termistörü ve ısıtıcısı ile ilgili sorun giderme adımlarını uygulayın.",
    "modul": "Kontrolör / sıcak yatak"
   },
   "2511": {
@@ -31,6 +277,27 @@
    "cozum": "1) Hazne termistörü kablo bağlantısını kontrol edin, yeniden takın. 2) Termistör hasarlıysa değiştirin.",
    "modul": "Kontrolör / hazne termistörü"
   },
+  "2512": {
+   "tam_kod": "BM2512",
+   "baslik": "Anakart sıcaklığı anormal",
+   "aciklama": "",
+   "cozum": "1) Anakart yakınında anormal ısı kaynağı var mı kontrol edin. 2) Anakart fanı soğutmuyor olabilir. 3) Anakart arızalıysa değiştirin.",
+   "modul": "Devre kartı"
+  },
+  "2515": {
+   "tam_kod": "TE2515",
+   "baslik": "Nozul sıcaklığı sınırı aşıyor, termistör kısa devre olabilir",
+   "aciklama": "",
+   "cozum": "1) Termistör kablosu kopmuş/kısa devre olabilir; onarın. 2) Termistör/sıcak uç hasarlıysa değiştirin.",
+   "modul": "Alet kiti / nozul"
+  },
+  "2516": {
+   "tam_kod": "CB2516",
+   "baslik": "Sıcak yatak termistörü kısa devre",
+   "aciklama": "",
+   "cozum": "1) Termistör kablosu kopmuş ve kısa devre yapmış olabilir; hasarlı parçayı onarın. 2) Termistör içten hasarlıysa değiştirin.",
+   "modul": "Kontrolör / sıcak yatak"
+  },
   "2517": {
    "tam_kod": "CT2517",
    "baslik": "Hazne termistörü kısa devre yapmış olabilir",
@@ -38,19 +305,40 @@
    "cozum": "1) Termistör kablosu kopmuş/kısa devre olabilir; onarın. 2) Termistör hasarlıysa değiştirin.",
    "modul": "Kontrolör / hazne termistörü"
   },
-  "0115": {
-   "tam_kod": "CM0115",
-   "baslik": "Bitmemiş görev algılandı, yazdırmaya devam edilsin mi",
+  "2519": {
+   "tam_kod": "CP2519",
+   "baslik": "Hazne ısıtıcı fanı anormal, hazne ısıtması kapalı",
    "aciklama": "",
-   "cozum": "Baskı sırasında güç kesildi, güç kaybı kurtarma tetiklendi. Parça yarıyı geçtiyse devam edin; az basıldıysa yeniden başlatın.",
-   "modul": "Kontrolör / motor"
+   "cozum": "Fan dönmüyor ya da hızı düşük: fan kablosu gevşek mi, fan sıkışmış mı kontrol edin.",
+   "modul": "Hazne ısıtma"
   },
-  "115": {
-   "tam_kod": "CM0115",
-   "baslik": "Bitmemiş görev algılandı, yazdırmaya devam edilsin mi",
+  "2559": {
+   "tam_kod": "CP2559",
+   "baslik": "Hazne ısıtma sorunu",
    "aciklama": "",
-   "cozum": "Baskı sırasında güç kesildi, güç kaybı kurtarma tetiklendi. Parça yarıyı geçtiyse devam edin; az basıldıysa yeniden başlatın.",
-   "modul": "Kontrolör / motor"
+   "cozum": "Hazne sıcaklığı beklendiği gibi yükselmiyor: kapak/kapı açık, hazne sızdırıyor ya da ısıtma modülü arızalı olabilir. Yazıcının kapalı olduğundan emin olun.",
+   "modul": "Hazne ısıtma"
+  },
+  "2564": {
+   "tam_kod": "TE2564",
+   "baslik": "Nozul beklendiği gibi ısınmıyor",
+   "aciklama": "",
+   "cozum": "Kapsamlı hata: nozul termistörü ve ısıtıcısı ile ilgili sorun giderme adımlarını uygulayın.",
+   "modul": "Alet kiti / nozul"
+  },
+  "2565": {
+   "tam_kod": "CB2565",
+   "baslik": "Isı yatağı beklendiği gibi ısınmıyor",
+   "aciklama": "",
+   "cozum": "Kapsamlı hata: sıcak yatak termistörü ve ısıtıcısı ile ilgili sorun giderme adımlarını uygulayın.",
+   "modul": "Kontrolör / sıcak yatak"
+  },
+  "2571": {
+   "tam_kod": "XD2571",
+   "baslik": "Yazdırma dosyası bozuk",
+   "aciklama": "",
+   "cozum": "Dosya ayrıştırılamıyor: dosya adında tanınmayan karakter olabilir ya da aktarımda bozulmuş olabilir. Yeniden adlandırıp yeniden gönderin.",
+   "modul": "Yazdırma dosyası"
   },
   "2573": {
    "tam_kod": "CX2573",
@@ -101,6 +389,34 @@
    "cozum": "Z ekseni ofset değeri ayar aralığını aşıyor; Z ofsetini aralık içine alın.",
    "modul": "Kontrolör / Z ekseni"
   },
+  "2710": {
+   "tam_kod": "CA2710",
+   "baslik": "Kayış gerginlik modülü anormal",
+   "aciklama": "",
+   "cozum": "Gerginlik modülü arızalı, değiştirilmesi gerekir.",
+   "modul": "Kayış gerginliği"
+  },
+  "2711": {
+   "tam_kod": "CA2711",
+   "baslik": "Otomatik kayış gerginliği arızası",
+   "aciklama": "",
+   "cozum": "Gerginlik modülü sıkışmış olabilir; modülü kontrol edin.",
+   "modul": "Kayış gerginliği"
+  },
+  "2761": {
+   "tam_kod": "TE2761",
+   "baslik": "Nozul seviyeleme sensöründe donanım arızası",
+   "aciklama": "",
+   "cozum": "Ekstrüder seviyeleme sensörü arızalı olabilir, değiştirilmesi gerekir.",
+   "modul": "Alet kiti / nozul"
+  },
+  "2762": {
+   "tam_kod": "TE2762",
+   "baslik": "Nozul seviye sensörü hasarlı ya da silme modülü düşmüş olabilir",
+   "aciklama": "",
+   "cozum": "Nozul seviye sensörünü (gerinim ölçer) ve silme modülünü kontrol edin, yeniden başlatmayı deneyin.",
+   "modul": "Alet kiti / nozul"
+  },
   "2768": {
    "tam_kod": "CZ2768",
    "baslik": "Z ekseni hedef arama sorunu, dış bozulma olabilir",
@@ -108,25 +424,11 @@
    "cozum": "Homing sırasında titreşim/dış kuvvet sensörü tetiklemiş olabilir. Homing sırasında yazıcıya dokunmayın, Z ekseni hareketini engelleyen şey olup olmadığını kontrol edin.",
    "modul": "Kontrolör / Z ekseni"
   },
-  "2783": {
-   "tam_kod": "CM2783",
-   "baslik": "Motor hareket engeli / ekstrüzyon anormalliği (aşırı akım koruması)",
-   "aciklama": "",
-   "cozum": "XY: nozul hareketinde engel; Z: yatak hareketinde engel; E: tıkanıklık/sıkışma olabilir. Baskı iptal edilir/duraklatılır, motor serbest bırakılır. Engeli kaldırın, gerekirse gücü kapatıp açın; E ekseninde ekstrüder tıkanıklığını kontrol edin.",
-   "modul": "Kontrolör / motor"
-  },
   "2781": {
    "tam_kod": "CM2781",
    "baslik": "Motor hız limiti aşıldı",
    "aciklama": "",
    "cozum": "XY/Z/E motor hız sınırı aşıldı, motor serbest bırakılır. Yazdırma hızını düşürün ya da yeniden dilimleyin; boştayken hareket hızını azaltın.",
-   "modul": "Kontrolör / motor"
-  },
-  "2790": {
-   "tam_kod": "CM2790",
-   "baslik": "Motor tanımlama hatası",
-   "aciklama": "",
-   "cozum": "X/Y/Z1/Z2/E motor tanınamadı: motor kablosu yanlış bağlı, gevşek ya da motor hasarlı olabilir. Bağlantıları kontrol edin.",
    "modul": "Kontrolör / motor"
   },
   "2782": {
@@ -136,6 +438,20 @@
    "cozum": "X/Y/E/Z1/Z2 motor bağlantısı gevşek ya da takılı değil olabilir; Z'de platform yüksekliğini koruyamaz. Bağlantıları kontrol edip yeniden deneyin.",
    "modul": "Kontrolör / motor"
   },
+  "2783": {
+   "tam_kod": "CM2783",
+   "baslik": "Motor hareket engeli / ekstrüzyon anormalliği (aşırı akım koruması)",
+   "aciklama": "",
+   "cozum": "XY: nozul hareketinde engel; Z: yatak hareketinde engel; E: tıkanıklık/sıkışma olabilir. Baskı iptal edilir/duraklatılır, motor serbest bırakılır. Engeli kaldırın, gerekirse gücü kapatıp açın; E ekseninde ekstrüder tıkanıklığını kontrol edin.",
+   "modul": "Kontrolör / motor"
+  },
+  "2790": {
+   "tam_kod": "CM2790",
+   "baslik": "Motor tanımlama hatası",
+   "aciklama": "",
+   "cozum": "X/Y/Z1/Z2/E motor tanınamadı: motor kablosu yanlış bağlı, gevşek ya da motor hasarlı olabilir. Bağlantıları kontrol edin.",
+   "modul": "Kontrolör / motor"
+  },
   "2798": {
    "tam_kod": "CM2798",
    "baslik": "Step-servo bağlantı sorunu",
@@ -143,173 +459,37 @@
    "cozum": "X/Y/E motor iletişim kablosu anormal bağlanmış olabilir. Gücü kapatıp yeniden başlatın, kabloyu kontrol edin.",
    "modul": "Kontrolör / motor"
   },
-  "2559": {
-   "tam_kod": "CP2559",
-   "baslik": "Hazne ısıtma sorunu",
+  "2832": {
+   "tam_kod": "FR2832",
+   "baslik": "Geri çekme sorunu: filament ya da makara sıkışması olabilir. Çözdükten sonra Yeniden Dene'ye basın.",
    "aciklama": "",
-   "cozum": "Hazne sıcaklığı beklendiği gibi yükselmiyor: kapak/kapı açık, hazne sızdırıyor ya da ısıtma modülü arızalı olabilir. Yazıcının kapalı olduğundan emin olun.",
-   "modul": "Hazne ısıtma"
+   "cozum": "CFS ışığı: çift kırmızı yanıp sönme. Olası neden: filament dolanmış, ekstrüderde/alt braketde sıkışmış ya da geri çekme sırasında makaraya düzgün sarılmamış.",
+   "modul": "CFS filament besleme",
+   "yazicilar": "K2 Plus"
   },
-  "0508": {
-   "tam_kod": "BS0508",
-   "baslik": "Depolama alanı doluyor",
+  "2833": {
+   "tam_kod": "FR2833",
+   "baslik": "Besleme sorunu: filament ya da makara sıkışması olabilir. Çözdükten sonra Yeniden Dene'ye basın.",
    "aciklama": "",
-   "cozum": "Boş alan azaldı: gereksiz G-code ve hızlandırılmış kamera dosyalarını silin.",
-   "modul": "Depolama"
+   "cozum": "CFS ışığı: tek kırmızı yanıp sönme. Olası neden: filament dolanmış/sıkışmış ya da ekstrüderde veya alt braketde sıkışmış.",
+   "modul": "CFS filament besleme",
+   "yazicilar": "K2 Plus"
   },
-  "508": {
-   "tam_kod": "BS0508",
-   "baslik": "Depolama alanı doluyor",
+  "2839": {
+   "tam_kod": "FR2839",
+   "baslik": "CFS slotundaki (örn. 1D) filament bitti, yeniden doldurun.",
    "aciklama": "",
-   "cozum": "Boş alan azaldı: gereksiz G-code ve hızlandırılmış kamera dosyalarını silin.",
-   "modul": "Depolama"
+   "cozum": "CFS ışığı: kırmızı nefes alma. İlgili slotun filamenti tükenmiş ve yeni filament yüklenmemiş.",
+   "modul": "CFS filament besleme",
+   "yazicilar": "K2 Plus"
   },
-  "2711": {
-   "tam_kod": "CA2711",
-   "baslik": "Otomatik kayış gerginliği arızası",
+  "2840": {
+   "tam_kod": "FS2840",
+   "baslik": "Komut başarısız: mevcut durum bu komutu desteklemiyor.",
    "aciklama": "",
-   "cozum": "Gerginlik modülü sıkışmış olabilir; modülü kontrol edin.",
-   "modul": "Kayış gerginliği"
-  },
-  "0120": {
-   "tam_kod": "CA0120",
-   "baslik": "Kayış gerginliği anormal",
-   "aciklama": "",
-   "cozum": "Kayış gerginliği düşük. Ayarlar → Kendi Kendini Test → Titreşim Optimizasyonu (Input Shaping) çalıştırıp sonra yazdırın.",
-   "modul": "Kayış gerginliği"
-  },
-  "120": {
-   "tam_kod": "CA0120",
-   "baslik": "Kayış gerginliği anormal",
-   "aciklama": "",
-   "cozum": "Kayış gerginliği düşük. Ayarlar → Kendi Kendini Test → Titreşim Optimizasyonu (Input Shaping) çalıştırıp sonra yazdırın.",
-   "modul": "Kayış gerginliği"
-  },
-  "2710": {
-   "tam_kod": "CA2710",
-   "baslik": "Kayış gerginlik modülü anormal",
-   "aciklama": "",
-   "cozum": "Gerginlik modülü arızalı, değiştirilmesi gerekir.",
-   "modul": "Kayış gerginliği"
-  },
-  "2519": {
-   "tam_kod": "CP2519",
-   "baslik": "Hazne ısıtıcı fanı anormal, hazne ısıtması kapalı",
-   "aciklama": "",
-   "cozum": "Fan dönmüyor ya da hızı düşük: fan kablosu gevşek mi, fan sıkışmış mı kontrol edin.",
-   "modul": "Hazne ısıtma"
-  },
-  "2512": {
-   "tam_kod": "BM2512",
-   "baslik": "Anakart sıcaklığı anormal",
-   "aciklama": "",
-   "cozum": "1) Anakart yakınında anormal ısı kaynağı var mı kontrol edin. 2) Anakart fanı soğutmuyor olabilir. 3) Anakart arızalıysa değiştirin.",
-   "modul": "Devre kartı"
-  },
-  "0110": {
-   "tam_kod": "BM0110",
-   "baslik": "Anakart bağlantı arızası",
-   "aciklama": "",
-   "cozum": "Anakart kabloları anormal ya da anakart hasarlı.",
-   "modul": "Devre kartı"
-  },
-  "110": {
-   "tam_kod": "BM0110",
-   "baslik": "Anakart bağlantı arızası",
-   "aciklama": "",
-   "cozum": "Anakart kabloları anormal ya da anakart hasarlı.",
-   "modul": "Devre kartı"
-  },
-  "0111": {
-   "tam_kod": "BM0111",
-   "baslik": "Nozul (sıcak uç kartı) bağlantısı anormal",
-   "aciklama": "",
-   "cozum": "Sıcak uç devre kartı kablolarını kontrol edip yeniden takın; kart hasarlıysa değiştirin.",
-   "modul": "Devre kartı"
-  },
-  "111": {
-   "tam_kod": "BM0111",
-   "baslik": "Nozul (sıcak uç kartı) bağlantısı anormal",
-   "aciklama": "",
-   "cozum": "Sıcak uç devre kartı kablolarını kontrol edip yeniden takın; kart hasarlıysa değiştirin.",
-   "modul": "Devre kartı"
-  },
-  "0112": {
-   "tam_kod": "BM0112",
-   "baslik": "Sıcak yatak kartı bağlantısı anormal",
-   "aciklama": "",
-   "cozum": "Sıcak yatak devre kartı kablolarını kontrol edip yeniden takın; kart hasarlıysa değiştirin.",
-   "modul": "Devre kartı"
-  },
-  "112": {
-   "tam_kod": "BM0112",
-   "baslik": "Sıcak yatak kartı bağlantısı anormal",
-   "aciklama": "",
-   "cozum": "Sıcak yatak devre kartı kablolarını kontrol edip yeniden takın; kart hasarlıysa değiştirin.",
-   "modul": "Devre kartı"
-  },
-  "2509": {
-   "tam_kod": "TE2509",
-   "baslik": "Nozul sıcaklığı okunamıyor, termistör bağlantısı kesik olabilir",
-   "aciklama": "",
-   "cozum": "1) Sıcak uç termistör kablosunu kontrol edin, yeniden takın. 2) Termistör/sıcak uç hasarlıysa değiştirin.",
-   "modul": "Alet kiti / nozul"
-  },
-  "2515": {
-   "tam_kod": "TE2515",
-   "baslik": "Nozul sıcaklığı sınırı aşıyor, termistör kısa devre olabilir",
-   "aciklama": "",
-   "cozum": "1) Termistör kablosu kopmuş/kısa devre olabilir; onarın. 2) Termistör/sıcak uç hasarlıysa değiştirin.",
-   "modul": "Alet kiti / nozul"
-  },
-  "2564": {
-   "tam_kod": "TE2564",
-   "baslik": "Nozul beklendiği gibi ısınmıyor",
-   "aciklama": "",
-   "cozum": "Kapsamlı hata: nozul termistörü ve ısıtıcısı ile ilgili sorun giderme adımlarını uygulayın.",
-   "modul": "Alet kiti / nozul"
-  },
-  "2111": {
-   "tam_kod": "TE2111",
-   "baslik": "Nozul sıcaklığı minimum ekstrüzyon sıcaklığının altında",
-   "aciklama": "",
-   "cozum": "Ekstrüzyon sıcaklığı yapılandırma minimumunun (170 °C) altında. Resmi dilimleyici kullanın; sıcak uç hasarlıysa ısıtma hatalarına bakın.",
-   "modul": "Alet kiti / nozul"
-  },
-  "0116": {
-   "tam_kod": "TR0116",
-   "baslik": "Filament bitti, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Ekrandaki filament değiştirme adımlarını izleyip filament yükleyin ve devam edin. Yanlış tetikleniyorsa filament sensörünü değiştirin.",
-   "modul": "Alet kiti / filament"
-  },
-  "116": {
-   "tam_kod": "TR0116",
-   "baslik": "Filament bitti, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Ekrandaki filament değiştirme adımlarını izleyip filament yükleyin ve devam edin. Yanlış tetikleniyorsa filament sensörünü değiştirin.",
-   "modul": "Alet kiti / filament"
-  },
-  "2852": {
-   "tam_kod": "TR2852",
-   "baslik": "Filament dedektörü anormal tetiklendi (harici makara + CFS)",
-   "aciklama": "",
-   "cozum": "CFS ile filament boşaltıldıktan sonra harici makaradan filament takılı kalmış ya da filament ekstrüderde kırılmış olabilir.",
-   "modul": "Alet kiti / filament"
-  },
-  "0501": {
-   "tam_kod": "TF0501",
-   "baslik": "Isı kesme (heatbreak) fan hızı çok düşük",
-   "aciklama": "",
-   "cozum": "1) Fan kablo terminalini yeniden takın. 2) Fan vidalarla sıkışmış olabilir. 3) Fan hasarlıysa değiştirin.",
-   "modul": "Alet kiti / fan"
-  },
-  "501": {
-   "tam_kod": "TF0501",
-   "baslik": "Isı kesme (heatbreak) fan hızı çok düşük",
-   "aciklama": "",
-   "cozum": "1) Fan kablo terminalini yeniden takın. 2) Fan vidalarla sıkışmış olabilir. 3) Fan hasarlıysa değiştirin.",
-   "modul": "Alet kiti / fan"
+   "cozum": "Başka bir komut çalışıyor ya da yazıcı bu komutu şu an kabul edemeyecek durumda olabilir. İşlem bitince yeniden deneyin.",
+   "modul": "CFS",
+   "yazicilar": "K2 Plus"
   },
   "2841": {
    "tam_kod": "TC2841",
@@ -318,18 +498,34 @@
    "cozum": "Kesme sırasında kesici sıkışmış ya da takılı değil; çözüp yeniden deneyin.",
    "modul": "Alet kiti / kesici"
   },
+  "2844": {
+   "tam_kod": "FB2844",
+   "baslik": "PTFE (teflon) boru pnömatik rakordan çıkmış olabilir; baskı duraklatıldı. Çözüp yeniden deneyin.",
+   "aciklama": "",
+   "cozum": "Teflon boru hattındaki bir pnömatik rakor gevşediğinde filament sürekli beslenir. Önce ekrandan filamenti geri sarın (gerekirse tekrar), sonra rakoru yeniden takıp devam edin.",
+   "modul": "CFS PTFE hattı",
+   "yazicilar": "K2 Plus"
+  },
+  "2845": {
+   "tam_kod": "FO2845",
+   "baslik": "Ekstrüder tıkanmış olabilir. Çözdükten sonra Yeniden Dene'ye basın.",
+   "aciklama": "",
+   "cozum": "Filament yıkama sırasında beş yollu sayaç ilerlemiyor: filament hareket etmiyor, ekstrüder tıkalı olabilir. Filamentin dolanma, sıkışma, aşınma ya da boğaza girememe durumunu kontrol edin.",
+   "modul": "CFS / ekstrüder",
+   "yazicilar": "K2 Plus"
+  },
+  "2852": {
+   "tam_kod": "TR2852",
+   "baslik": "Filament dedektörü anormal tetiklendi (harici makara + CFS)",
+   "aciklama": "",
+   "cozum": "CFS ile filament boşaltıldıktan sonra harici makaradan filament takılı kalmış ya da filament ekstrüderde kırılmış olabilir.",
+   "modul": "Alet kiti / filament"
+  },
   "2854": {
    "tam_kod": "TC2854",
    "baslik": "Ekstrüderde filament var, kesici kalibrasyonu yapılamıyor",
    "aciklama": "",
    "cozum": "Titreşim optimizasyonu için ekstrüderde filament olmamalı; filamenti boşaltın (gerekirse motoru serbest bırakıp elle geri çekin) ve tekrar deneyin.",
-   "modul": "Alet kiti / kesici"
-  },
-  "2856": {
-   "tam_kod": "TC2856",
-   "baslik": "Kesici sorunu, kesici sıkışmış ya da eksik",
-   "aciklama": "",
-   "cozum": "Kesici sıkışmış ya da yok; çözdükten sonra Yeniden Dene'ye basın.",
    "modul": "Alet kiti / kesici"
   },
   "2855": {
@@ -339,33 +535,12 @@
    "cozum": "Titreşim optimizasyonu sırasında kesici konumu kalibre edilemedi; çözüp yeniden deneyin.",
    "modul": "Alet kiti / kesici"
   },
-  "2762": {
-   "tam_kod": "TE2762",
-   "baslik": "Nozul seviye sensörü hasarlı ya da silme modülü düşmüş olabilir",
+  "2856": {
+   "tam_kod": "TC2856",
+   "baslik": "Kesici sorunu, kesici sıkışmış ya da eksik",
    "aciklama": "",
-   "cozum": "Nozul seviye sensörünü (gerinim ölçer) ve silme modülünü kontrol edin, yeniden başlatmayı deneyin.",
-   "modul": "Alet kiti / nozul"
-  },
-  "2761": {
-   "tam_kod": "TE2761",
-   "baslik": "Nozul seviyeleme sensöründe donanım arızası",
-   "aciklama": "",
-   "cozum": "Ekstrüder seviyeleme sensörü arızalı olabilir, değiştirilmesi gerekir.",
-   "modul": "Alet kiti / nozul"
-  },
-  "0526": {
-   "tam_kod": "TF0526",
-   "baslik": "Model fan hızı çok düşük",
-   "aciklama": "",
-   "cozum": "Fan hızı ayarlanan değerin altında; kablo ve fanın sıkışıp sıkışmadığını kontrol edin.",
-   "modul": "Alet kiti / fan"
-  },
-  "526": {
-   "tam_kod": "TF0526",
-   "baslik": "Model fan hızı çok düşük",
-   "aciklama": "",
-   "cozum": "Fan hızı ayarlanan değerin altında; kablo ve fanın sıkışıp sıkışmadığını kontrol edin.",
-   "modul": "Alet kiti / fan"
+   "cozum": "Kesici sıkışmış ya da yok; çözdükten sonra Yeniden Dene'ye basın.",
+   "modul": "Alet kiti / kesici"
   },
   "2863": {
    "tam_kod": "TR2863",
@@ -373,20 +548,6 @@
    "aciklama": "",
    "cozum": "CFS boşaltma sonrası harici makara takılı ya da filament ekstrüderde kırılmış olabilir.",
    "modul": "Alet kiti / filament"
-  },
-  "2000": {
-   "tam_kod": "XS2000",
-   "baslik": "Sistem hatası, yeniden başlatın",
-   "aciklama": "",
-   "cozum": "Sistem çöktü; kapatıp açın. Sürerse günlükleri cs@creality.com adresine iletin.",
-   "modul": "Sistem"
-  },
-  "2001": {
-   "tam_kod": "XS2001",
-   "baslik": "Sistem hatası, yeniden başlatın",
-   "aciklama": "",
-   "cozum": "Sistem çöktü; kapatıp açın. Sürerse günlükleri cs@creality.com adresine iletin.",
-   "modul": "Sistem"
   },
   "3000": {
    "tam_kod": "XS3000",
@@ -409,375 +570,12 @@
    "cozum": "Sistem çöktü; kapatıp açın. Sürerse günlükleri cs@creality.com adresine iletin.",
    "modul": "Sistem"
   },
-  "2060": {
-   "tam_kod": "XS2060",
-   "baslik": "Sistem hatası, yeniden başlatın",
-   "aciklama": "",
-   "cozum": "Sistem çöktü; kapatıp açın. Sürerse günlükleri cs@creality.com adresine iletin.",
-   "modul": "Sistem"
-  },
-  "2093": {
-   "tam_kod": "XS2093",
-   "baslik": "Sistem hatası, yeniden başlatın",
-   "aciklama": "",
-   "cozum": "Sistem çöktü; kapatıp açın. Sürerse günlükleri cs@creality.com adresine iletin.",
-   "modul": "Sistem"
-  },
-  "2571": {
-   "tam_kod": "XD2571",
-   "baslik": "Yazdırma dosyası bozuk",
-   "aciklama": "",
-   "cozum": "Dosya ayrıştırılamıyor: dosya adında tanınmayan karakter olabilir ya da aktarımda bozulmuş olabilir. Yeniden adlandırıp yeniden gönderin.",
-   "modul": "Yazdırma dosyası"
-  },
-  "0101": {
-   "tam_kod": "AC0101",
-   "baslik": "AI: baskı kalitesi sorunu (spagetti) algılandı, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Baskıyı kontrol edin. Yanlış alarm sıksa AI hassasiyetini normale alın ya da AI'yi kapatın.",
-   "modul": "AI algılama / kamera"
-  },
-  "101": {
-   "tam_kod": "AC0101",
-   "baslik": "AI: baskı kalitesi sorunu (spagetti) algılandı, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Baskıyı kontrol edin. Yanlış alarm sıksa AI hassasiyetini normale alın ya da AI'yi kapatın.",
-   "modul": "AI algılama / kamera"
-  },
-  "0104": {
-   "tam_kod": "AC0104",
-   "baslik": "AI: baskı plakasında yabancı cisim algılandı, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Plakayı temizleyin. Yanlış alarmsa Yeniden Dene'ye basın.",
-   "modul": "AI algılama / kamera"
-  },
-  "104": {
-   "tam_kod": "AC0104",
-   "baslik": "AI: baskı plakasında yabancı cisim algılandı, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Plakayı temizleyin. Yanlış alarmsa Yeniden Dene'ye basın.",
-   "modul": "AI algılama / kamera"
-  },
-  "0123": {
-   "tam_kod": "AC0123",
-   "baslik": "AI: baskı plakası eksik, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Plakayı yerleştirin. Yanlış alarmsa Yeniden Dene'ye basın.",
-   "modul": "AI algılama / kamera"
-  },
-  "123": {
-   "tam_kod": "AC0123",
-   "baslik": "AI: baskı plakası eksik, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Plakayı yerleştirin. Yanlış alarmsa Yeniden Dene'ye basın.",
-   "modul": "AI algılama / kamera"
-  },
-  "0124": {
-   "tam_kod": "AC0124",
-   "baslik": "AI: baskı plakası eksik ve/veya yabancı cisim var, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Plakayı yerleştirin/temizleyin. Yanlış alarmsa Yeniden Dene'ye basın.",
-   "modul": "AI algılama / kamera"
-  },
-  "124": {
-   "tam_kod": "AC0124",
-   "baslik": "AI: baskı plakası eksik ve/veya yabancı cisim var, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Plakayı yerleştirin/temizleyin. Yanlış alarmsa Yeniden Dene'ye basın.",
-   "modul": "AI algılama / kamera"
-  },
-  "0500": {
-   "tam_kod": "AC0500",
-   "baslik": "AI: baskı kalitesi sorunu tespit edildi",
-   "aciklama": "",
-   "cozum": "Devam edilebilecekse ekrandan/dilimleyiciden/Cloud'dan devam edin; başarısızsa temizleyip yeniden başlatın. Sistem Ayarları → Kamera → AI'den kapatılabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "500": {
-   "tam_kod": "AC0500",
-   "baslik": "AI: baskı kalitesi sorunu tespit edildi",
-   "aciklama": "",
-   "cozum": "Devam edilebilecekse ekrandan/dilimleyiciden/Cloud'dan devam edin; başarısızsa temizleyip yeniden başlatın. Sistem Ayarları → Kamera → AI'den kapatılabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "0504": {
-   "tam_kod": "AC0504",
-   "baslik": "Dosya otomatik PA kalibrasyonunu desteklemiyor, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Firmware 1.3.3.0+ ve güncel CrealityPrint/Orca/Prusa dilimleyici kullanın.",
-   "modul": "AI algılama / kamera"
-  },
-  "504": {
-   "tam_kod": "AC0504",
-   "baslik": "Dosya otomatik PA kalibrasyonunu desteklemiyor, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Firmware 1.3.3.0+ ve güncel CrealityPrint/Orca/Prusa dilimleyici kullanın.",
-   "modul": "AI algılama / kamera"
-  },
-  "0510": {
-   "tam_kod": "AC0510",
-   "baslik": "Kamera başlatılamadı",
-   "aciklama": "",
-   "cozum": "Yazılım çökmesi ya da gevşek kamera bağlantısı; yeniden başlatın.",
-   "modul": "AI algılama / kamera"
-  },
-  "510": {
-   "tam_kod": "AC0510",
-   "baslik": "Kamera başlatılamadı",
-   "aciklama": "",
-   "cozum": "Yazılım çökmesi ya da gevşek kamera bağlantısı; yeniden başlatın.",
-   "modul": "AI algılama / kamera"
-  },
-  "0511": {
-   "tam_kod": "AC0511",
-   "baslik": "Dosya akış oranı kalibrasyonunu desteklemiyor, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Dosya Creality Print 5 dışı bir dilimleyiciden olabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "511": {
-   "tam_kod": "AC0511",
-   "baslik": "Dosya akış oranı kalibrasyonunu desteklemiyor, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Dosya Creality Print 5 dışı bir dilimleyiciden olabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "0512": {
-   "tam_kod": "AC0512",
-   "baslik": "Akış oranı kalibrasyonu başarısız, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Kamera tanımlama hatası ya da değer aralık dışı olabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "512": {
-   "tam_kod": "AC0512",
-   "baslik": "Akış oranı kalibrasyonu başarısız, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Kamera tanımlama hatası ya da değer aralık dışı olabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "0513": {
-   "tam_kod": "AC0513",
-   "baslik": "Otomatik PA kalibrasyon görüntü anomalisi, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Kamera görüntüsü kullanılamadı; kamerayı/aydınlatmayı kontrol edin.",
-   "modul": "AI algılama / kamera"
-  },
-  "513": {
-   "tam_kod": "AC0513",
-   "baslik": "Otomatik PA kalibrasyon görüntü anomalisi, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Kamera görüntüsü kullanılamadı; kamerayı/aydınlatmayı kontrol edin.",
-   "modul": "AI algılama / kamera"
-  },
-  "0514": {
-   "tam_kod": "AC0514",
-   "baslik": "Otomatik PA kalibrasyonu başarısız, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Kamera tanımlama hatası, değer aralık dışı ya da kalibrasyon deseni kalitesiz olabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "514": {
-   "tam_kod": "AC0514",
-   "baslik": "Otomatik PA kalibrasyonu başarısız, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Kamera tanımlama hatası, değer aralık dışı ya da kalibrasyon deseni kalitesiz olabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "0515": {
-   "tam_kod": "AC0515",
-   "baslik": "Akış oranı kalibrasyon görüntü anomalisi, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Kamera görüntüsü kullanılamadı.",
-   "modul": "AI algılama / kamera"
-  },
-  "515": {
-   "tam_kod": "AC0515",
-   "baslik": "Akış oranı kalibrasyon görüntü anomalisi, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Kamera görüntüsü kullanılamadı.",
-   "modul": "AI algılama / kamera"
-  },
-  "0516": {
-   "tam_kod": "AC0516",
-   "baslik": "Akış oranı kalibrasyonu başarısız, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Kamera tanımlama hatası ya da değer aralık dışı olabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "516": {
-   "tam_kod": "AC0516",
-   "baslik": "Akış oranı kalibrasyonu başarısız, varsayılanla yazdırılıyor",
-   "aciklama": "",
-   "cozum": "Kamera tanımlama hatası ya da değer aralık dışı olabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "0523": {
-   "tam_kod": "AC0523",
-   "baslik": "AI: model çarpılması (warping) tespit edildi",
-   "aciklama": "",
-   "cozum": "Yanlış alarmsa AI hassasiyetini normale alın ya da AI'yi kapatın.",
-   "modul": "AI algılama / kamera"
-  },
-  "523": {
-   "tam_kod": "AC0523",
-   "baslik": "AI: model çarpılması (warping) tespit edildi",
-   "aciklama": "",
-   "cozum": "Yanlış alarmsa AI hassasiyetini normale alın ya da AI'yi kapatın.",
-   "modul": "AI algılama / kamera"
-  },
-  "0117": {
-   "tam_kod": "AC0117",
-   "baslik": "AI: model çarpılması tespit edildi, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Baskıyı kontrol edin. Yanlış alarmsa AI hassasiyetini normale alın ya da AI'yi kapatın.",
-   "modul": "AI algılama / kamera"
-  },
-  "117": {
-   "tam_kod": "AC0117",
-   "baslik": "AI: model çarpılması tespit edildi, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Baskıyı kontrol edin. Yanlış alarmsa AI hassasiyetini normale alın ya da AI'yi kapatın.",
-   "modul": "AI algılama / kamera"
-  },
-  "0509": {
-   "tam_kod": "AC0509",
-   "baslik": "Hazne sıcaklığı çok yüksek, kamera kapatıldı",
-   "aciklama": "",
-   "cozum": "Kamerayı korumak için; hazne 50 °C altına inince otomatik açılır.",
-   "modul": "AI algılama / kamera"
-  },
-  "509": {
-   "tam_kod": "AC0509",
-   "baslik": "Hazne sıcaklığı çok yüksek, kamera kapatıldı",
-   "aciklama": "",
-   "cozum": "Kamerayı korumak için; hazne 50 °C altına inince otomatik açılır.",
-   "modul": "AI algılama / kamera"
-  },
-  "0103": {
-   "tam_kod": "AC0103",
-   "baslik": "AI: ilk katman baskı kalitesi sorunu, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Yapıştırıcı/özel plaka deseni yanlış algılanabilir. Yanlış alarm sıksa hassasiyeti normale alın ya da AI'yi kapatın.",
-   "modul": "AI algılama / kamera"
-  },
-  "103": {
-   "tam_kod": "AC0103",
-   "baslik": "AI: ilk katman baskı kalitesi sorunu, baskı duraklatıldı",
-   "aciklama": "",
-   "cozum": "Yapıştırıcı/özel plaka deseni yanlış algılanabilir. Yanlış alarm sıksa hassasiyeti normale alın ya da AI'yi kapatın.",
-   "modul": "AI algılama / kamera"
-  },
-  "0503": {
-   "tam_kod": "AC0503",
-   "baslik": "AI: ilk katman baskı kalitesi sorunu",
-   "aciklama": "",
-   "cozum": "Devam edilebilecekse ekrandan devam edin; başarısızsa temizleyip yeniden yazdırın. AI işlevi kapatılabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "503": {
-   "tam_kod": "AC0503",
-   "baslik": "AI: ilk katman baskı kalitesi sorunu",
-   "aciklama": "",
-   "cozum": "Devam edilebilecekse ekrandan devam edin; başarısızsa temizleyip yeniden yazdırın. AI işlevi kapatılabilir.",
-   "modul": "AI algılama / kamera"
-  },
-  "0505": {
-   "tam_kod": "AL0505",
-   "baslik": "AI LiDAR anomalisi",
-   "aciklama": "",
-   "cozum": "1) LiDAR kablo bağlantılarını kontrol edin. 2) LiDAR'ı değiştirin.",
-   "modul": "AI LiDAR"
-  },
-  "505": {
-   "tam_kod": "AL0505",
-   "baslik": "AI LiDAR anomalisi",
-   "aciklama": "",
-   "cozum": "1) LiDAR kablo bağlantılarını kontrol edin. 2) LiDAR'ı değiştirin.",
-   "modul": "AI LiDAR"
-  },
-  "0506": {
-   "tam_kod": "AL0506",
-   "baslik": "AI LiDAR kalibrasyon hatası",
-   "aciklama": "",
-   "cozum": "1) LiDAR kamerasını silip yeniden deneyin. 2) Etiketler kirli/okunamıyorsa değiştirin.",
-   "modul": "AI LiDAR"
-  },
-  "506": {
-   "tam_kod": "AL0506",
-   "baslik": "AI LiDAR kalibrasyon hatası",
-   "aciklama": "",
-   "cozum": "1) LiDAR kamerasını silip yeniden deneyin. 2) Etiketler kirli/okunamıyorsa değiştirin.",
-   "modul": "AI LiDAR"
-  },
-  "0507": {
-   "tam_kod": "AL0507",
-   "baslik": "AI LiDAR hizalama hatası",
-   "aciklama": "",
-   "cozum": "1) LiDAR kamerası kirli olabilir. 2) Kalibrasyon modeli basılamıyor ya da gereksinimi karşılamıyor.",
-   "modul": "AI LiDAR"
-  },
-  "507": {
-   "tam_kod": "AL0507",
-   "baslik": "AI LiDAR hizalama hatası",
-   "aciklama": "",
-   "cozum": "1) LiDAR kamerası kirli olabilir. 2) Kalibrasyon modeli basılamıyor ya da gereksinimi karşılamıyor.",
-   "modul": "AI LiDAR"
-  },
-  "2833": {
-   "tam_kod": "FR2833",
-   "baslik": "Besleme sorunu: filament ya da makara sıkışması olabilir. Çözdükten sonra Yeniden Dene'ye basın.",
-   "aciklama": "",
-   "cozum": "CFS ışığı: tek kırmızı yanıp sönme. Olası neden: filament dolanmış/sıkışmış ya da ekstrüderde veya alt braketde sıkışmış.",
-   "modul": "CFS filament besleme",
-   "yazicilar": "K2 Plus"
-  },
-  "2832": {
-   "tam_kod": "FR2832",
-   "baslik": "Geri çekme sorunu: filament ya da makara sıkışması olabilir. Çözdükten sonra Yeniden Dene'ye basın.",
-   "aciklama": "",
-   "cozum": "CFS ışığı: çift kırmızı yanıp sönme. Olası neden: filament dolanmış, ekstrüderde/alt braketde sıkışmış ya da geri çekme sırasında makaraya düzgün sarılmamış.",
-   "modul": "CFS filament besleme",
-   "yazicilar": "K2 Plus"
-  },
-  "2839": {
-   "tam_kod": "FR2839",
-   "baslik": "CFS slotundaki (örn. 1D) filament bitti, yeniden doldurun.",
-   "aciklama": "",
-   "cozum": "CFS ışığı: kırmızı nefes alma. İlgili slotun filamenti tükenmiş ve yeni filament yüklenmemiş.",
-   "modul": "CFS filament besleme",
-   "yazicilar": "K2 Plus"
-  },
   "4828": {
    "tam_kod": "FR4828",
    "baslik": "CFS içinde filament (örn. 1D) kopmuş olabilir.",
    "aciklama": "",
    "cozum": "CFS ışığı: sürekli kırmızı. Filament beş yollu dağıtıcıda sıkışmış; ekstrüdere gönderilemiyor ve geri çekilemiyor. Dağıtıcıyı açıp filamenti çıkarın.",
    "modul": "CFS filament besleme",
-   "yazicilar": "K2 Plus"
-  },
-  "2840": {
-   "tam_kod": "FS2840",
-   "baslik": "Komut başarısız: mevcut durum bu komutu desteklemiyor.",
-   "aciklama": "",
-   "cozum": "Başka bir komut çalışıyor ya da yazıcı bu komutu şu an kabul edemeyecek durumda olabilir. İşlem bitince yeniden deneyin.",
-   "modul": "CFS",
-   "yazicilar": "K2 Plus"
-  },
-  "2844": {
-   "tam_kod": "FB2844",
-   "baslik": "PTFE (teflon) boru pnömatik rakordan çıkmış olabilir; baskı duraklatıldı. Çözüp yeniden deneyin.",
-   "aciklama": "",
-   "cozum": "Teflon boru hattındaki bir pnömatik rakor gevşediğinde filament sürekli beslenir. Önce ekrandan filamenti geri sarın (gerekirse tekrar), sonra rakoru yeniden takıp devam edin.",
-   "modul": "CFS PTFE hattı",
-   "yazicilar": "K2 Plus"
-  },
-  "2845": {
-   "tam_kod": "FO2845",
-   "baslik": "Ekstrüder tıkanmış olabilir. Çözdükten sonra Yeniden Dene'ye basın.",
-   "aciklama": "",
-   "cozum": "Filament yıkama sırasında beş yollu sayaç ilerlemiyor: filament hareket etmiyor, ekstrüder tıkalı olabilir. Filamentin dolanma, sıkışma, aşınma ya da boğaza girememe durumunu kontrol edin.",
-   "modul": "CFS / ekstrüder",
    "yazicilar": "K2 Plus"
   }
  }

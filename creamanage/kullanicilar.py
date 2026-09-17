@@ -74,7 +74,8 @@ def gorunum(k: dict) -> dict:
 
 
 TEMALAR = ("acik", "koyu", "otomatik")
-IZINLI_TERCIHLER = {"tema": lambda v: v in TEMALAR, "modul": lambda v: isinstance(v, str) and len(v) <= 32}
+IZINLI_TERCIHLER = {"tema": lambda v: v in TEMALAR, "modul": lambda v: isinstance(v, str) and len(v) <= 32,
+                    "yenileme_sn": lambda v: isinstance(v, (int, float)) and 1 <= v <= 600}
 
 
 class KullaniciYonetimi:

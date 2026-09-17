@@ -87,9 +87,52 @@ def acikla(errcode, key=None) -> dict:
     return sonuc
 
 
+def kanonik(kod) -> str:
+    """'CM0115' / '0115' / 115 → '115' (tek anahtar biçimi)."""
+    sayi = "".join(ch for ch in str(kod or "") if ch.isdigit())
+    return str(int(sayi)) if sayi else ""
+
+
 def kaydet(kodlar_sozlugu: dict, kaynak: str = "") -> int:
-    veri = {"_aciklama": yukle().get("_aciklama", ""), "_kaynak": kaynak,
-            "_guncelleme": time.strftime("%Y-%m-%d %H:%M"), "kodlar": {str(k): v for k, v in kodlar_sozlugu.items()}}
+    birlesik: dict = {}
+    for k, v in kodlar_sozlugu.items():
+        anahtar = kanonik(k)
+        if anahtar and isinstance(v, dict):
+            birlesik[anahtar] = v
+    veri = {"_aciklama": yukle().get("_aciklama", ""), "_kaynak": kaynak or yukle().get("_kaynak", ""),
+            "_guncelleme": time.strftime("%Y-%m-%d %H:%M"), "kodlar": dict(sorted(birlesik.items(), key=lambda x: int(x[0])))}
     DOSYA.write_text(json.dumps(veri, ensure_ascii=False, indent=1), encoding="utf-8")
     yukle(zorla=True)
     return len(veri["kodlar"])
+
+
+ALANLAR = ("tam_kod", "baslik", "aciklama", "cozum", "modul", "yazicilar")
+
+
+def kod_kaydet(kod, kayit: dict) -> dict:
+    """Tek kodu ekler/günceller; kayıt döndürür."""
+    anahtar = kanonik(kod)
+    if not anahtar:
+        raise ValueError("kod sayısal bir bölüm içermeli (ör. CA2070 ya da 2070)")
+    temiz = {a: str(kayit.get(a, "") or "").strip()[:2000] for a in ALANLAR}
+    if not temiz["baslik"]:
+        raise ValueError("başlık boş olamaz")
+    if not temiz["tam_kod"]:
+        temiz["tam_kod"] = str(kod).strip().upper()
+    k = dict(kodlar()); k[anahtar] = temiz
+    kaydet(k)
+    return dict(temiz, kod=anahtar)
+
+
+def kod_sil(kod) -> bool:
+    anahtar = kanonik(kod)
+    k = dict(kodlar())
+    if anahtar not in k:
+        return False
+    del k[anahtar]
+    kaydet(k)
+    return True
+
+
+def listele() -> list[dict]:
+    return [dict(v, kod=k) for k, v in sorted(kodlar().items(), key=lambda x: int(x[0]))]

@@ -12,9 +12,26 @@
   const $$ = (s, k) => Array.from((k || document).querySelectorAll(s));
 
   const MODULLER = { yazicilar: "Yazıcılar", dosya_listesi: "Dosya Listesi", dosya_yoneticisi: "Dosya Yöneticisi",
-    olaylar: "Olaylar", bildirimler: "Bildirimler", kullanicilar: "Kullanıcılar" };
+    olaylar: "Olaylar", bildirimler: "Bildirimler", kullanicilar: "Kullanıcılar", hata_kodlari: "Hata Kodları" };
   const MODUL_GORUNUM = { yazicilar: "kart", dosya_listesi: "sade", dosya_yoneticisi: "yukle" };
-  const st = { yazicilar: new Map(), olaylar: [], tarama: null, acikYazici: null, ws: null, gorunum: "kart", ben: null, modul: "yazicilar" };
+  // ---------- yenileme aralığı: sunucudan gelen güncellemeler tamponlanır, seçilen aralıkta ekrana uygulanır ----------
+  const bekleyenGuncelleme = new Map();
+  let yenilemeZamanlayici = null, sonYenileme = 0;
+  function yenilemeUygula() {
+    if (!bekleyenGuncelleme.size) return;
+    const liste = Array.from(bekleyenGuncelleme.values()); bekleyenGuncelleme.clear();
+    if (liste.length > 8) cizHepsi(); else liste.forEach(y => cizKart(y));
+    cizSayaclar(); cizGruplar();
+    const acik = liste.find(y => y.id === st.acikYazici); if (acik) ayrintiDoldur(acik);
+    sonYenileme = Date.now(); yenilemeDurum();
+  }
+  function yenilemeDurum() { const d = $("#yenileme-durum"); if (d) d.textContent = sonYenileme ? new Date(sonYenileme).toLocaleTimeString("tr-TR") : ""; }
+  function yenilemeKur(sn) {
+    st.yenilemeSn = sn; $("#yenileme-sn").value = String(sn);
+    clearInterval(yenilemeZamanlayici);
+    yenilemeZamanlayici = setInterval(yenilemeUygula, Math.max(1, sn) * 1000);
+  }
+  const st = { yazicilar: new Map(), olaylar: [], tarama: null, acikYazici: null, ws: null, gorunum: "kart", ben: null, modul: "yazicilar", yenilemeSn: 1 };
   try { const m = localStorage.getItem("creamanage.modul"); if (MODULLER[m]) st.modul = m; } catch (e) { /* özel pencere */ }
   st.gorunum = MODUL_GORUNUM[st.modul] || "kart";
 
@@ -70,6 +87,7 @@
   async function temaDegistir() {
     const yeni = etkinTema() === "koyu" ? "acik" : "koyu";
     temaUygula(yeni);
+    if (st.acikYazici && ayModul === "gecmis" && ayGecmisVeri.length) grafikleriCiz();
     try { await put("/api/ben/tercihler", { tema: yeni }); if (st.ben) st.ben.tercihler = Object.assign({}, st.ben.tercihler, { tema: yeni }); }
     catch (e) { bildir("Tema tercihi kaydedilemedi: " + e.message); }
   }
@@ -78,6 +96,7 @@
     $$("[data-rol]").forEach(el => el.classList.toggle("yetkisiz", !yetkili(el.dataset.rol)));
     if (st.ben) {
       const t = (st.ben.tercihler || {}).tema; if (t) temaUygula(t);
+      const y = Number((st.ben.tercihler || {}).yenileme_sn); if (y && y !== st.yenilemeSn) yenilemeKur(y);
       $("#ben-ad").textContent = st.ben.ad || st.ben.kullanici_adi; $("#ben-rol").textContent = st.ben.rol_adi;
       const bh = basHarfler(st.ben.ad || st.ben.kullanici_adi), renk = avatarRenk(st.ben.kullanici_adi);
       $$("#avatar, #avatar-buyuk").forEach(a => { a.textContent = bh; a.style.setProperty("--avatar-renk", renk); });
@@ -107,8 +126,8 @@
         cizHepsi(); cizOlaylar(); taramaGuncelle();
       } else if (m.tur === "yazici") {
         st.yazicilar.set(m.yazici.id, m.yazici);
-        cizKart(m.yazici); cizSayaclar(); cizGruplar();
-        if (st.acikYazici === m.yazici.id) ayrintiDoldur(m.yazici);
+        bekleyenGuncelleme.set(m.yazici.id, m.yazici);
+        if (st.yenilemeSn <= 1) yenilemeUygula();
       } else if (m.tur === "yazici_silindi") {
         st.yazicilar.delete(m.id); cizHepsi();
         if (st.acikYazici === m.id) kapat("ortu-ayrinti");
@@ -182,6 +201,7 @@
     if (ad === "kullanicilar") kullanicilarAc();
     if (ad === "bildirimler") bildirimAc();
     if (ad === "olaylar") cizOlaylar();
+    if (ad === "hata_kodlari") hataKodlariAc();
   }
   function menuKapat() { $("#menu-uygulamalar").hidden = true; $("#menu-hesap").hidden = true; $("#btn-uygulamalar").classList.remove("acik"); }
   const yuklemeler = new Map();   // yazıcı id → {yuzde, metin}
@@ -318,9 +338,11 @@
   async function ayGecmisYukle(id) {
     const aralik = Number($("#ay-gecmis-aralik").value), adim = Number($("#ay-gecmis-adim").value);
     const bas = aralik ? Math.floor(Date.now() / 1000) - aralik : "";
+    $$("#ay-grafikler .viz-alan").forEach(k => k.classList.add("yenileniyor"));
     try {
       const [t, d] = await Promise.all([api(`/api/yazicilar/${id}/telemetri?limit=2000&adim=${adim}&baslangic=${bas}`), api(`/api/yazicilar/${id}/degisimler?limit=500&baslangic=${bas}`)]);
       ayGecmisVeri = t.ornekler;
+      grafikleriCiz();
       const oz = t.ozet || {};
       $("#ay-gecmis-ozet").textContent = `${t.ornekler.length} örnek gösteriliyor · dosyada ${oz.ornek || 0} örnek, ${oz.degisim || 0} değişim` + (oz.boyut ? ` · ${(oz.boyut / 1024 / 1024).toFixed(1)} MB` : "");
       $("#ay-degisim-tablo tbody").innerHTML = d.degisimler.map(x => `<tr class="${x.alan === "hata_kodu" && x.yeni && x.yeni !== "0" ? "kritik" : ""}"><td class="zaman">${new Date(x.zaman * 1000).toLocaleString("tr-TR")}</td><td class="eylem">${kacis(ALAN_AD[x.alan] || x.alan)}</td><td>${kacis(degerAd(x.alan, x.eski))}</td><td>${kacis(degerAd(x.alan, x.yeni))}</td><td class="ipucu">${kacis(x.baglam || "")}</td></tr>`).join("")
@@ -330,6 +352,90 @@
         || '<tr><td colspan="12" class="ipucu">Bu aralıkta örnek yok.</td></tr>';
     } catch (e) { bildir(e.message); }
   }
+  // ---------- grafikler: SVG çizgi grafiği, kesişim çizgisi + ipucu, klavye ----------
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  function el(ad, nit, metin) { const e = document.createElementNS(SVG_NS, ad); for (const k in (nit || {})) e.setAttribute(k, nit[k]); if (metin != null) e.textContent = metin; return e; }
+  function tikDegerleri(min, max, adet) {
+    const ham = (max - min) / Math.max(1, adet), buyukluk = Math.pow(10, Math.floor(Math.log10(ham || 1)));
+    const aday = [1, 2, 2.5, 5, 10].map(x => x * buyukluk).find(x => (max - min) / x <= adet) || buyukluk * 10;
+    const t = []; for (let v = Math.ceil(min / aday) * aday; v <= max + 1e-9; v += aday) t.push(Math.round(v * 1000) / 1000); return t;
+  }
+  const zamanEtiket = (ts, uzun) => { const d = new Date(ts * 1000); return uzun ? d.toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }); };
+  /** seriler: [{ad, alan, renk, kesik?, alan_dolgu?}] — veri artan zamanlı örnekler; kopuk bağlantıda çizgi kesilir. */
+  function cizGrafik(kap, veri, seriler, secenek) {
+    const o = Object.assign({ birim: "", min: null, max: null, yuzde: false }, secenek || {});
+    kap.innerHTML = "";
+    const G = kap.getBoundingClientRect(), W = Math.max(320, G.width), H = Math.max(160, G.height);
+    const P = { sol: 40, sag: 56, ust: 10, alt: 24 }, iw = W - P.sol - P.sag, ih = H - P.ust - P.alt;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img" }); kap.appendChild(svg);
+    const noktalar = veri.filter(v => v.zaman != null);
+    if (noktalar.length < 2) { svg.appendChild(el("text", { x: W / 2, y: H / 2, "text-anchor": "middle", class: "bos" }, "Bu aralıkta çizilecek veri yok")); return null; }
+    const t0 = noktalar[0].zaman, t1 = noktalar[noktalar.length - 1].zaman, ts = Math.max(1, t1 - t0);
+    let yMin = o.min, yMax = o.max;
+    if (yMin == null || yMax == null) {
+      const degerler = []; noktalar.forEach(v => seriler.forEach(s => { const d = v[s.alan]; if (d != null && !isNaN(d)) degerler.push(Number(d)); }));
+      const dMin = degerler.length ? Math.min(...degerler) : 0, dMax = degerler.length ? Math.max(...degerler) : 1;
+      if (yMin == null) yMin = Math.min(0, dMin); if (yMax == null) yMax = dMax <= yMin ? yMin + 1 : dMax * 1.05;
+    }
+    const tikler = tikDegerleri(yMin, yMax, 4); yMax = Math.max(yMax, tikler[tikler.length - 1] || yMax);
+    const X = (t) => P.sol + (t - t0) / ts * iw, Y = (v) => P.ust + ih - (v - yMin) / (yMax - yMin) * ih;
+    const grid = el("g", { class: "grid" }), eksen = el("g", { class: "eksen" });
+    tikler.forEach(v => { grid.appendChild(el("line", { x1: P.sol, x2: P.sol + iw, y1: Y(v), y2: Y(v) })); svg.appendChild(el("text", { x: P.sol - 6, y: Y(v) + 4, "text-anchor": "end" }, String(v))); });
+    svg.appendChild(grid);
+    eksen.appendChild(el("line", { x1: P.sol, x2: P.sol + iw, y1: P.ust + ih, y2: P.ust + ih })); svg.appendChild(eksen);
+    const uzun = ts > 86400, xAdet = Math.max(2, Math.floor(iw / (uzun ? 110 : 70)));
+    for (let i = 0; i <= xAdet; i++) { const t = t0 + ts * i / xAdet; svg.appendChild(el("text", { x: X(t), y: H - 6, "text-anchor": i === 0 ? "start" : (i === xAdet ? "end" : "middle") }, zamanEtiket(t, uzun))); }
+    const yollar = {};
+    seriler.forEach(s => {
+      let d = "", acik = false, son = null;
+      noktalar.forEach(v => {
+        const deger = v[s.alan], kopuk = v.baglanti && v.baglanti !== "bagli";
+        if (deger == null || isNaN(deger) || kopuk) { acik = false; return; }
+        const x = X(v.zaman), y = Y(Number(deger));
+        d += (acik ? " L" : " M") + x.toFixed(1) + " " + y.toFixed(1); acik = true; son = { x, y, deger: Number(deger) };
+      });
+      if (s.alan_dolgu && d) { const ilk = d.indexOf("M"); const alanD = d + ` L${X(t1).toFixed(1)} ${Y(yMin).toFixed(1)} L${X(t0).toFixed(1)} ${Y(yMin).toFixed(1)} Z`; svg.appendChild(el("path", { d: alanD, class: "alan", fill: s.renk })); }
+      svg.appendChild(el("path", { d: d || "M0 0", class: s.kesik ? "hedef" : "seri", stroke: s.renk }));
+      if (son && !s.kesik) { svg.appendChild(el("circle", { cx: son.x, cy: son.y, r: 4, fill: s.renk, class: "nokta" })); svg.appendChild(el("text", { x: son.x + 8, y: son.y + 4, class: "son-etiket" }, (o.yuzde ? "%" : "") + Math.round(son.deger) + (o.yuzde ? "" : o.birim))); }
+      yollar[s.alan] = true;
+    });
+    // kesişim çizgisi + noktalar (etkileşim)
+    const kesisim = el("line", { class: "kesisim", y1: P.ust, y2: P.ust + ih, x1: -10, x2: -10, visibility: "hidden" }); svg.appendChild(kesisim);
+    const vurgu = seriler.filter(s => !s.kesik).map(s => { const c = el("circle", { r: 4.5, class: "nokta", fill: s.renk, visibility: "hidden" }); svg.appendChild(c); return { s, c }; });
+    const ipucu = $("#viz-ipucu"), kok = $("#ay-grafikler");
+    function goster(i, px) {
+      const v = noktalar[i]; if (!v) return;
+      const x = X(v.zaman); kesisim.setAttribute("x1", x); kesisim.setAttribute("x2", x); kesisim.setAttribute("visibility", "visible");
+      vurgu.forEach(({ s, c }) => { const d = v[s.alan]; if (d == null || isNaN(d) || (v.baglanti && v.baglanti !== "bagli")) c.setAttribute("visibility", "hidden"); else { c.setAttribute("cx", x); c.setAttribute("cy", Y(Number(d))); c.setAttribute("visibility", "visible"); } });
+      ipucu.innerHTML = ""; const z = document.createElement("div"); z.className = "zaman"; z.textContent = new Date(v.zaman * 1000).toLocaleString("tr-TR"); ipucu.appendChild(z);
+      seriler.forEach(s => { const d = v[s.alan]; const satir = document.createElement("div"); satir.className = "satir"; const i2 = document.createElement("i"); i2.style.setProperty("--renk", s.renk); if (s.kesik) i2.className = "kesik"; const ad = document.createElement("span"); ad.textContent = s.ad; const b = document.createElement("b"); b.textContent = d == null || isNaN(d) ? "–" : (o.yuzde ? "%" : "") + Math.round(Number(d) * 10) / 10 + (o.yuzde ? "" : o.birim); satir.append(i2, ad, b); ipucu.appendChild(satir); });
+      ipucu.hidden = false;
+      const R = kok.getBoundingClientRect(), K = kap.getBoundingClientRect(); const solX = K.left - R.left + (px != null ? px : (x / W) * K.width);
+      ipucu.style.top = (K.top - R.top + 8) + "px"; ipucu.style.left = Math.min(R.width - ipucu.offsetWidth - 4, Math.max(0, solX + 14)) + "px";
+      kap.dataset.i = i;
+    }
+    function gizle() { kesisim.setAttribute("visibility", "hidden"); vurgu.forEach(({ c }) => c.setAttribute("visibility", "hidden")); ipucu.hidden = true; }
+    function enYakin(px) { const K = kap.getBoundingClientRect(); const t = t0 + Math.max(0, Math.min(1, ((px / K.width) * W - P.sol) / iw)) * ts; let lo = 0, hi = noktalar.length - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (noktalar[m].zaman < t) lo = m + 1; else hi = m; } if (lo > 0 && Math.abs(noktalar[lo - 1].zaman - t) < Math.abs(noktalar[lo].zaman - t)) lo--; return lo; }
+    kap.onpointermove = (e) => { const K = kap.getBoundingClientRect(); goster(enYakin(e.clientX - K.left), e.clientX - K.left); };
+    kap.onpointerleave = gizle;
+    kap.onkeydown = (e) => { if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return; e.preventDefault(); let i = Number(kap.dataset.i || noktalar.length - 1); i = Math.max(0, Math.min(noktalar.length - 1, i + (e.key === "ArrowRight" ? 1 : -1))); goster(i); };
+    kap.onfocus = () => goster(Number(kap.dataset.i || noktalar.length - 1)); kap.onblur = gizle;
+    return svg;
+  }
+  const serilerSicaklik = () => { const r = getComputedStyle($("#ay-grafikler")); const s1 = r.getPropertyValue("--seri-1").trim(), s2 = r.getPropertyValue("--seri-2").trim(), s3 = r.getPropertyValue("--seri-3").trim(); return [
+    { ad: "Nozul", alan: "nozul", renk: s1 }, { ad: "Nozul hedef", alan: "nozul_hedef", renk: s1, kesik: true },
+    { ad: "Tabla", alan: "tabla", renk: s2 }, { ad: "Tabla hedef", alan: "tabla_hedef", renk: s2, kesik: true },
+    { ad: "Kabin", alan: "kabin", renk: s3 }, { ad: "Kabin hedef", alan: "kabin_hedef", renk: s3, kesik: true }]; };
+  function grafikleriCiz() {
+    const veri = ayGecmisVeri.slice().reverse();          // artan zaman
+    const seriler = serilerSicaklik();
+    $("#lejant-sicaklik").innerHTML = seriler.filter(s => !s.kesik).map(s => `<span><i style="--renk:${s.renk}"></i>${kacis(s.ad)}</span>`).join("") + `<span><i class="kesik" style="--renk:var(--viz-muted)"></i>hedef</span>`;
+    const k1 = $("#grafik-sicaklik .viz-alan"), k2 = $("#grafik-ilerleme .viz-alan");
+    cizGrafik(k1, veri, seriler, { birim: "°", min: 0 });
+    cizGrafik(k2, veri, [{ ad: "İlerleme", alan: "ilerleme", renk: seriler[0].renk, alan_dolgu: true }], { yuzde: true, min: 0, max: 100 });
+    k1.classList.remove("yenileniyor"); k2.classList.remove("yenileniyor");
+  }
+  window.addEventListener("resize", () => { if (st.acikYazici && ayModul === "gecmis" && ayGecmisVeri.length) grafikleriCiz(); });
   ["#ay-gecmis-aralik", "#ay-gecmis-adim"].forEach(s => $(s).addEventListener("change", () => st.acikYazici && ayGecmisYukle(st.acikYazici)));
   $("#ay-gecmis-yenile").addEventListener("click", () => st.acikYazici && ayGecmisYukle(st.acikYazici));
   $("#ay-gecmis-csv").addEventListener("click", () => {
@@ -638,7 +744,7 @@
     yazici_ekledi: "Yazıcı ekledi", yazici_guncelledi: "Yazıcı güncelledi", yazici_sildi: "Yazıcı sildi", tarama_baslatti: "Ağ taraması başlattı",
     bildirim_ayarladi: "Bildirim ayarı değiştirdi", bildirim_test: "Bildirim testi gönderdi", tarama_iptal: "Ağ taramasını iptal etti", komut_duraklat: "Baskıyı durdurdu (duraklattı)", komut_surdur: "Baskıyı başlattı (sürdürdü)",
     komut_durdur: "Baskıyı iptal etti", komut_isik: "Işığı değiştirdi", komut_nozul: "Nozul sıcaklığı ayarladı", komut_tabla: "Tabla sıcaklığı ayarladı",
-    komut_fan: "Fan ayarladı", dosya_yukledi: "Dosya yükledi ve yazdırdı", dosya_yukleme_hatasi: "Dosya yükleme HATASI" };
+    komut_fan: "Fan ayarladı", dosya_yukledi: "Dosya yükledi ve yazdırdı", dosya_yukleme_hatasi: "Dosya yükleme HATASI", hata_kodu_kaydetti: "Hata kodu ekledi/güncelledi", hata_kodu_sildi: "Hata kodu sildi", hata_kodu_ice_aktardi: "Hata kodu tablosu içe aktardı" };
   async function gecmisAc(id) {
     try {
       const v = await api(id == null ? "/api/kullanicilar/gecmis?limit=1000" : `/api/kullanicilar/${id}/gecmis`);
@@ -662,6 +768,58 @@
     if (st.ws) { st.ws.onclose = null; st.ws.close(); }
     try { await post("/api/cikis"); } finally { location.href = "/giris"; }
   });
+
+  // ---------- hata kodları yönetimi (sistem yöneticisi) ----------
+  let hkListe = [];
+  async function hataKodlariAc() {
+    try { const v = await api("/api/hata_kodlari"); hkListe = v.liste; hkBilgi(v.bilgi); hkTablo(); }
+    catch (e) { bildir(e.message); }
+  }
+  function hkBilgi(b) { $("#hk-bilgi").textContent = `${b.adet} kod · kaynak: ${b.kaynak || "–"} · güncelleme: ${b.guncelleme || "–"}`; }
+  function hkTablo() {
+    const q = $("#hk-arama").value.trim().toLowerCase();
+    const liste = hkListe.filter(k => !q || `${k.kod} ${k.tam_kod} ${k.baslik} ${k.modul} ${k.aciklama} ${k.cozum}`.toLowerCase().includes(q));
+    $("#hk-tablo tbody").innerHTML = liste.map(k => `<tr data-kod="${kacis(k.kod)}">
+      <td class="kod"><input name="tam_kod" value="${kacis(k.tam_kod || k.kod)}"><div class="ipucu">${kacis(k.kod)}</div></td>
+      <td><input name="modul" value="${kacis(k.modul || "")}"></td>
+      <td><textarea name="baslik">${kacis(k.baslik || "")}</textarea></td>
+      <td><textarea name="aciklama">${kacis(k.aciklama || "")}</textarea></td>
+      <td><textarea name="cozum">${kacis(k.cozum || "")}</textarea></td>
+      <td class="eylem"><button class="btn" data-eylem="kaydet">Kaydet</button> <button class="btn btn-tehlike" data-eylem="sil">Sil</button></td></tr>`).join("")
+      || `<tr><td colspan="6" class="ipucu">${q ? "Eşleşen kod yok." : "Tablo boş."}</td></tr>`;
+  }
+  $("#hk-arama").addEventListener("input", hkTablo);
+  $("#hk-tablo").addEventListener("click", async (e) => {
+    const b = e.target.closest("button[data-eylem]"); if (!b) return;
+    const tr = b.closest("tr"), kod = tr.dataset.kod;
+    try {
+      if (b.dataset.eylem === "sil") { if (!confirm(`${kod} kodu tablodan silinsin mi?`)) return; const v = await del(`/api/hata_kodlari/${kod}`); hkBilgi(v.bilgi); bildir("Silindi"); }
+      else { const g = {}; tr.querySelectorAll("input,textarea").forEach(i => g[i.name] = i.value); const v = await put(`/api/hata_kodlari/${kod}`, g); hkBilgi(v.bilgi); bildir(`${v.kayit.tam_kod} kaydedildi`); }
+      hkListe = (await api("/api/hata_kodlari")).liste; hkTablo();
+    } catch (err) { bildir(err.message, 6000); }
+  });
+  $("#hk-yeni").addEventListener("submit", async (e) => {
+    e.preventDefault(); const f = e.target;
+    try {
+      const v = await put(`/api/hata_kodlari/${encodeURIComponent(f.tam_kod.value.trim())}`, { tam_kod: f.tam_kod.value.trim().toUpperCase(), modul: f.modul.value, baslik: f.baslik.value, cozum: f.cozum.value });
+      hkBilgi(v.bilgi); f.reset(); bildir(`${v.kayit.tam_kod} eklendi`); hkListe = (await api("/api/hata_kodlari")).liste; hkTablo();
+    } catch (err) { bildir(err.message, 6000); }
+  });
+  $("#hk-dosya").addEventListener("change", async () => {
+    const dosya = $("#hk-dosya").files[0]; if (!dosya) return;
+    const fd = new FormData(); fd.append("file", dosya, dosya.name);
+    try {
+      const r = await fetch("/api/hata_kodlari/ice_aktar", { method: "POST", body: fd }); const v = await r.json();
+      if (!r.ok) throw new Error(v.hata || r.statusText);
+      bildir(`${v.alinan} kod alındı, tabloda ${v.toplam} kod`, 6000); hkBilgi(v.bilgi); hkListe = (await api("/api/hata_kodlari")).liste; hkTablo();
+    } catch (err) { bildir(err.message, 8000); }
+    $("#hk-dosya").value = "";
+  });
+  $("#yenileme-sn").addEventListener("change", async () => {
+    const sn = Number($("#yenileme-sn").value) || 1; yenilemeKur(sn); yenilemeUygula();
+    try { await put("/api/ben/tercihler", { yenileme_sn: sn }); if (st.ben) st.ben.tercihler = Object.assign({}, st.ben.tercihler, { yenileme_sn: sn }); } catch (e) { bildir(e.message); }
+  });
+  yenilemeKur(1);
 
   // ---------- genel ----------
   function ac(id) { $("#" + id).hidden = false; }

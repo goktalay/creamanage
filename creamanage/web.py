@@ -61,6 +61,11 @@ def gerekli_rol(yontem: str, yol: str) -> str:
     """Her istek için en düşük yeterli rol."""
     if yol.startswith("/api/kullanicilar") or yol.startswith("/api/ayarlar"):
         return "sistem_yoneticisi"
+    if yol.startswith("/api/hata_kodlari") and yontem != "GET":
+        return "sistem_yoneticisi"
+    if yontem != "GET" and (yol in ("/api/yazicilar", "/api/yazicilar/toplu") or yol.startswith("/api/tarama")
+                            or (yontem in ("PUT", "DELETE") and yol.startswith("/api/yazicilar/"))):
+        return "sistem_yoneticisi"          # yazıcı ekleme/silme/ayar/tarama yalnız sistem yöneticisi
     if yol in ("/api/cikis", "/api/ben", "/api/ben/parola", "/api/ben/tercihler"):
         return "gozetmen"
     if yontem in ("POST", "PUT", "DELETE", "PATCH"):
@@ -472,7 +477,63 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
         return _json({"olaylar": _olay_suz(filo.vt.olaylar(limit), istek)})
 
     async def hata_kodlari_oku(istek):
-        return _json({"bilgi": HK.bilgi(), "kodlar": HK.kodlar()})
+        return _json({"bilgi": HK.bilgi(), "kodlar": HK.kodlar(), "liste": HK.listele()})
+
+    async def hata_kodu_yaz(istek):
+        kod = istek.match_info["kod"]
+        v = await _govde(istek)
+        try:
+            kayit = HK.kod_kaydet(kod, v)
+        except ValueError as e:
+            return _hata(str(e))
+        _denetim(istek, "hata_kodu_kaydetti", kayit["tam_kod"], kayit["baslik"][:120])
+        return _json({"kayit": kayit, "bilgi": HK.bilgi()})
+
+    async def hata_kodu_sil(istek):
+        kod = istek.match_info["kod"]
+        if not HK.kod_sil(kod):
+            return _hata("kod bulunamadı", 404)
+        _denetim(istek, "hata_kodu_sildi", kod)
+        return _json({"silindi": HK.kanonik(kod), "bilgi": HK.bilgi()})
+
+    async def hata_kodlari_ice_aktar(istek):
+        """multipart file: .csv (kod;başlık;açıklama;çözüm;modül), .json ({"kodlar":{…}} ya da düz sözlük), .html (Creality sayfası)."""
+        import sys as _sys
+        _sys.path.insert(0, str(WEB_DIZIN.parent / "araclar"))
+        from hata_kodlari_al import csv_ayristir, html_ayristir  # noqa: WPS433
+        okuyucu = await istek.multipart()
+        ad, icerik = "", b""
+        async for parca in okuyucu:
+            if parca.name == "file":
+                ad = (parca.filename or "").lower()
+                icerik = await parca.read(decode=False)
+                break
+        if not icerik:
+            return _hata("dosya eksik")
+        metin = icerik.decode("utf-8-sig", errors="ignore")
+        try:
+            if ad.endswith(".json"):
+                veri = json.loads(metin)
+                yeni = veri.get("kodlar", veri) if isinstance(veri, dict) else {}
+                yeni = {k: v for k, v in yeni.items() if isinstance(v, dict) and not str(k).startswith("_")}
+            elif ad.endswith(".csv") or ad.endswith(".txt"):
+                fd, yol = tempfile.mkstemp(suffix=".csv")
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(metin)
+                try:
+                    yeni = csv_ayristir(yol)
+                finally:
+                    os.unlink(yol)
+            else:
+                yeni = html_ayristir(metin)
+        except (ValueError, OSError) as e:
+            return _hata(f"dosya çözümlenemedi: {e}")
+        if not yeni:
+            return _hata("dosyada kod bulunamadı (CSV: kod;başlık;açıklama;çözüm;modül — noktalı virgülle)")
+        mevcut = dict(HK.kodlar()); mevcut.update({HK.kanonik(k): v for k, v in yeni.items() if HK.kanonik(k)})
+        adet = HK.kaydet(mevcut, f"içe aktarım: {ad} ({istek['kullanici']['kullanici_adi']})")
+        _denetim(istek, "hata_kodu_ice_aktardi", ad, f"{len(yeni)} kod, toplam {adet}")
+        return _json({"alinan": len(yeni), "toplam": adet, "bilgi": HK.bilgi()})
 
     # --- Telegram bildirim ayarları ---
     def _tg() -> TelegramBildirici:
@@ -577,6 +638,9 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
     app.router.add_post("/api/tarama/iptal", tarama_iptal)
     app.router.add_get("/api/olaylar", olaylar)
     app.router.add_get("/api/hata_kodlari", hata_kodlari_oku)
+    app.router.add_put("/api/hata_kodlari/{kod}", hata_kodu_yaz)
+    app.router.add_delete("/api/hata_kodlari/{kod}", hata_kodu_sil)
+    app.router.add_post("/api/hata_kodlari/ice_aktar", hata_kodlari_ice_aktar)
     app.router.add_get("/api/ayarlar/telegram", telegram_oku)
     app.router.add_put("/api/ayarlar/telegram", telegram_yaz)
     app.router.add_post("/api/ayarlar/telegram/test", telegram_test)

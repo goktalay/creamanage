@@ -63,6 +63,48 @@ class HataKoduTesti(unittest.TestCase):
         self.assertEqual(k["2718"]["aciklama"], "Nozzle heating failed"); self.assertEqual(k["2718"]["cozum"], "Check the thermistor")
 
 
+class HataKoduApiTesti(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self._eski = HK.DOSYA
+        self.tmp = tempfile.TemporaryDirectory()
+        HK.DOSYA = Path(self.tmp.name) / "h.json"; HK.yukle(zorla=True)
+        self.vt = Veritabani(Path(self.tmp.name) / "t.sqlite")
+        self.filo = Filo(self.vt); await self.filo.baslat()
+        self.app = uygulama_olustur(self.filo)
+        self.admin = TestClient(TestServer(self.app)); await self.admin.start_server()
+        self.yy = TestClient(TestServer(self.app)); await self.yy.start_server()
+        ky = KullaniciYonetimi(self.vt); ky.ekle("admin", "A", "sistem_yoneticisi", "testparola123"); ky.ekle("yyon", "Y", "yazici_yoneticisi", "testparola123")
+        await self.admin.post("/api/giris", json={"kullanici_adi": "admin", "parola": "testparola123"})
+        await self.yy.post("/api/giris", json={"kullanici_adi": "yyon", "parola": "testparola123"})
+
+    async def asyncTearDown(self):
+        await self.admin.close(); await self.yy.close(); self.vt.kapat(); HK.DOSYA = self._eski; HK.yukle(zorla=True); self.tmp.cleanup()
+
+    async def test_yonetim(self):
+        r = await self.admin.put("/api/hata_kodlari/CA2070", json={"tam_kod": "CA2070", "baslik": "Kayış gerdirme hatası", "cozum": "Gerdiriciyi kontrol edin", "modul": "Kayış"})
+        self.assertEqual(r.status, 200, await r.text()); v = await r.json(); self.assertEqual(v["kayit"]["kod"], "2070")
+        r = await self.admin.put("/api/hata_kodlari/2071", json={"baslik": ""}); self.assertEqual(r.status, 400)
+        r = await self.yy.put("/api/hata_kodlari/2072", json={"baslik": "x"}); self.assertEqual(r.status, 403)     # yalnız sistem yöneticisi
+        r = await self.yy.get("/api/hata_kodlari"); self.assertEqual(r.status, 200)                              # okuma herkese
+        self.assertEqual(HK.acikla(500, "2070")["metin"], "Kayış gerdirme hatası")
+        # CSV içe aktarım
+        import aiohttp as _a
+        fd = _a.FormData(); fd.add_field("file", "CB2510;Sıcak yatak termistörü açık devre;;Kabloyu kontrol edin;Kontrolör\nabc;x\n".encode("utf-8"), filename="tablo.csv")
+        r = await self.admin.post("/api/hata_kodlari/ice_aktar", data=fd); self.assertEqual(r.status, 200, await r.text())
+        v = await r.json(); self.assertEqual(v["alinan"], 1); self.assertEqual(v["toplam"], 2)
+        # JSON içe aktarım
+        fd = _a.FormData(); fd.add_field("file", json.dumps({"kodlar": {"XS2000": {"baslik": "Sistem hatası", "cozum": "Yeniden başlatın"}}}).encode(), filename="k.json")
+        r = await self.admin.post("/api/hata_kodlari/ice_aktar", data=fd); self.assertEqual((await r.json())["toplam"], 3)
+        r = await self.admin.get("/api/hata_kodlari"); liste = (await r.json())["liste"]; self.assertEqual([k["kod"] for k in liste], ["2000", "2070", "2510"])
+        r = await self.admin.delete("/api/hata_kodlari/CA2070"); self.assertEqual(r.status, 200)
+        r = await self.admin.delete("/api/hata_kodlari/CA2070"); self.assertEqual(r.status, 404)
+        self.assertIn("hata_kodu_kaydetti", [g["eylem"] for g in self.vt.denetim_listesi()])
+        self.assertIn("hata_kodu_ice_aktardi", [g["eylem"] for g in self.vt.denetim_listesi()])
+        # tercih: yenileme_sn
+        r = await self.admin.put("/api/ben/tercihler", json={"yenileme_sn": 10}); self.assertEqual(r.status, 200)
+        r = await self.admin.put("/api/ben/tercihler", json={"yenileme_sn": 0}); self.assertEqual(r.status, 400)
+
+
 class MudahaleTesti(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.sahte = await filo_kur(1, baslangic=2, port=PORT, hizli=False)

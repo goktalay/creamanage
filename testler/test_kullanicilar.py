@@ -28,8 +28,11 @@ class HashTesti(unittest.TestCase):
 
     def test_gerekli_rol(self):
         self.assertEqual(gerekli_rol("GET", "/api/yazicilar"), "gozetmen")
-        self.assertEqual(gerekli_rol("POST", "/api/yazicilar"), "yazici_yoneticisi")
+        self.assertEqual(gerekli_rol("POST", "/api/yazicilar"), "sistem_yoneticisi")       # ekleme yalnız sistem yöneticisi
+        self.assertEqual(gerekli_rol("DELETE", "/api/yazicilar/3"), "sistem_yoneticisi")
+        self.assertEqual(gerekli_rol("POST", "/api/tarama"), "sistem_yoneticisi")
         self.assertEqual(gerekli_rol("POST", "/api/yazicilar/3/komut"), "yazici_yoneticisi")
+        self.assertEqual(gerekli_rol("POST", "/api/yazicilar/3/dosya"), "yazici_yoneticisi")
         self.assertEqual(gerekli_rol("PUT", "/api/ayarlar/telegram"), "sistem_yoneticisi")
         self.assertEqual(gerekli_rol("GET", "/api/ayarlar/telegram"), "sistem_yoneticisi")
         self.assertEqual(gerekli_rol("GET", "/api/kullanicilar"), "sistem_yoneticisi")
@@ -156,14 +159,16 @@ class ApiTesti(unittest.IsolatedAsyncioTestCase):
         r = await yy.get("/api/ayarlar/telegram"); self.assertEqual(r.status, 403)
         r = await goz.get("/api/kullanicilar"); self.assertEqual(r.status, 403)
         ws = await goz.ws_connect("/ws"); self.assertEqual((await ws.receive_json())["tur"], "anlik"); await ws.close()
-        # Yazıcı yöneticisi: yazıcı işleri serbest, kullanıcı yönetimi yasak
-        r = await yy.post("/api/yazicilar", json={"ad": "Y", "ip": "127.0.0.9"}); self.assertEqual(r.status, 201)
+        # Yazıcı yöneticisi: komut/yükleme serbest; ekleme, silme ve kullanıcı yönetimi yasak
+        r = await yy.post("/api/yazicilar", json={"ad": "Y", "ip": "127.0.0.9"}); self.assertEqual(r.status, 403)
+        r = await admin.post("/api/yazicilar", json={"ad": "Y", "ip": "127.0.0.9"}); self.assertEqual(r.status, 201)
         yid = (await r.json())["yazici"]["id"]
         r = await yy.post(f"/api/yazicilar/{yid}/komut", json={"komut": "isik", "deger": 1}); self.assertEqual(r.status, 200)
         r = await yy.get("/api/kullanicilar"); self.assertEqual(r.status, 403)
         r = await yy.post("/api/kullanicilar", json={"kullanici_adi": "z", "rol": "gozetmen", "parola": PAROLA}); self.assertEqual(r.status, 403)
         r = await goz.delete(f"/api/yazicilar/{yid}"); self.assertEqual(r.status, 403)
-        r = await yy.delete(f"/api/yazicilar/{yid}"); self.assertEqual(r.status, 200)
+        r = await yy.delete(f"/api/yazicilar/{yid}"); self.assertEqual(r.status, 403)
+        r = await admin.delete(f"/api/yazicilar/{yid}"); self.assertEqual(r.status, 200)
         # Sistem yöneticisi: kullanıcı yönetimi
         r = await admin.get("/api/kullanicilar"); v = await r.json(); self.assertEqual(len(v["kullanicilar"]), 3)
         goz_id = next(k["id"] for k in v["kullanicilar"] if k["kullanici_adi"] == "goz")
@@ -171,7 +176,7 @@ class ApiTesti(unittest.IsolatedAsyncioTestCase):
         r = await admin.post("/api/kullanicilar", json={"kullanici_adi": "yeni", "ad": "Yeni", "rol": "gozetmen", "parola": PAROLA}); self.assertEqual(r.status, 201)
         r = await admin.post("/api/kullanicilar", json={"kullanici_adi": "yeni", "rol": "gozetmen", "parola": PAROLA}); self.assertEqual(r.status, 400)
         r = await admin.put(f"/api/kullanicilar/{goz_id}", json={"rol": "yazici_yoneticisi", "ad": "Terfi"}); self.assertEqual(r.status, 200)
-        r = await goz.post("/api/yazicilar", json={"ad": "x", "ip": "127.0.0.8"}); self.assertEqual(r.status, 201)   # terfi anında geçerli
+        r = await goz.post(f"/api/yazicilar/{yid}/komut", json={"komut": "isik", "deger": 1}); self.assertEqual(r.status, 404)   # terfi anında geçerli (403 değil; yazıcı silindi → 404)
         r = await admin.put(f"/api/kullanicilar/{admin_id}", json={"rol": "gozetmen"}); self.assertEqual(r.status, 400)  # kendi rolü
         r = await admin.delete(f"/api/kullanicilar/{admin_id}"); self.assertEqual(r.status, 400)                          # kendini silme
         r = await admin.put(f"/api/kullanicilar/{goz_id}", json={"etkin": False}); self.assertEqual(r.status, 200)
@@ -192,7 +197,7 @@ class ApiTesti(unittest.IsolatedAsyncioTestCase):
         yy_id = next(k["id"] for k in v["kullanicilar"] if k["kullanici_adi"] == "yyon")
         r = await admin.get(f"/api/kullanicilar/{yy_id}/gecmis"); self.assertEqual(r.status, 200)
         eylemler = [g["eylem"] for g in (await r.json())["gecmis"]]
-        for e in ("giris", "yazici_ekledi", "komut_isik", "yazici_sildi", "parola_degistirdi"):
+        for e in ("giris", "komut_isik", "parola_degistirdi"):
             self.assertIn(e, eylemler, eylemler)
         komut = next(g for g in (await r.json())["gecmis"] if g["eylem"] == "komut_isik")
         self.assertIn("127.0.0.9", komut["hedef"])

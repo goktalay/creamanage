@@ -34,6 +34,7 @@
       <button class="uyg" data-modul="olaylar"><span class="uyg-ikon">🔔</span>Olaylar</button>
       <button class="uyg" data-modul="bildirimler" data-rol="sistem_yoneticisi"><span class="uyg-ikon">✈️</span>Bildirimler</button>
       <button class="uyg" data-modul="kullanicilar" data-rol="sistem_yoneticisi"><span class="uyg-ikon">👥</span>Kullanıcılar</button>
+      <button class="uyg" data-modul="hata_kodlari" data-rol="sistem_yoneticisi"><span class="uyg-ikon">🧾</span>Hata Kodları</button>
     </div>
     <button class="avatar-btn" id="btn-avatar" title="Hesap" aria-haspopup="true"><span class="avatar" id="avatar">?</span></button>
     <div class="acilir hesap" id="menu-hesap" hidden>
@@ -62,14 +63,14 @@
     <select id="filtre-grup"><option value="">Tüm gruplar</option></select>
     <span class="bosluk"></span>
     <span class="ipucu" id="sonuc-sayisi"></span>
-    <button class="btn btn-birincil" id="btn-sihirbaz" data-rol="yazici_yoneticisi">+ Yazıcı Ekle</button>
+    <button class="btn btn-birincil" id="btn-sihirbaz" data-rol="sistem_yoneticisi">+ Yazıcı Ekle</button>
   </div>
 
   <section class="modul" id="modul-yazicilar">
     <div class="kartlar" id="kartlar"></div>
     <div class="bos" id="bos" hidden>
       <p>Henüz yazıcı yok.</p>
-      <button class="btn btn-birincil" id="btn-sihirbaz-2" data-rol="yazici_yoneticisi">Ağı tarayıp yazıcı ekle</button>
+      <button class="btn btn-birincil" id="btn-sihirbaz-2" data-rol="sistem_yoneticisi">Ağı tarayıp yazıcı ekle</button>
     </div>
   </section>
 
@@ -135,11 +136,43 @@
       </form>
     </div>
   </section>
+  <section class="modul" id="modul-hata_kodlari" hidden>
+    <div class="panel">
+      <div class="satir arada" style="flex-wrap: wrap">
+        <div>
+          <p class="ipucu" id="hk-bilgi"></p>
+          <p class="ipucu">Yazıcının gönderdiği <code>key</code> alanı tablodaki sayısal kodla eşleşir (ör. CY2586 → 2586). Değişiklikler anında tüm ekranlara yansır.</p>
+        </div>
+        <div class="satir">
+          <input type="search" id="hk-arama" placeholder="Kod, başlık, modül ara…">
+          <label class="btn" for="hk-dosya">Dosyadan içe aktar</label>
+          <input type="file" id="hk-dosya" accept=".csv,.json,.html,.htm,.txt" hidden>
+        </div>
+      </div>
+      <form class="yeni-kullanici hk-yeni" id="hk-yeni">
+        <label>Kod <input name="tam_kod" required placeholder="CA2070"></label>
+        <label>Modül <input name="modul" placeholder="Kayış gerginliği"></label>
+        <label>Başlık <input name="baslik" required placeholder="Kayış gerdirme hatası"></label>
+        <label>Çözüm <input name="cozum" placeholder="…"></label>
+        <button class="btn btn-birincil" type="submit">Ekle</button>
+      </form>
+      <div class="tablo-kaydir hk-kaydir">
+        <table class="tablo gecmis" id="hk-tablo">
+          <thead><tr><th>Kod</th><th>Modül</th><th>Başlık</th><th>Açıklama</th><th>Çözüm</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 </main>
 
 <footer class="alt">
   <div class="sayaclar" id="sayaclar"></div>
   <span class="bosluk"></span>
+  <label class="yenileme" title="Yazıcı ekranlarının yenilenme aralığı">Yenileme
+    <select id="yenileme-sn"><option value="1">1 sn</option><option value="3">3 sn</option><option value="5">5 sn</option><option value="10">10 sn</option><option value="60">1 dk</option></select>
+    <span class="ipucu" id="yenileme-durum"></span>
+  </label>
   <span id="baglanti-rozeti" class="rozet rozet-kopuk">Sunucu bağlantısı yok</span>
 </footer>
 
@@ -214,6 +247,17 @@
           <span class="ipucu" id="ay-gecmis-ozet"></span>
           <button class="btn" id="ay-gecmis-yenile">Yenile</button>
           <button class="btn" id="ay-gecmis-csv">CSV indir</button>
+        </div>
+        <div class="viz-root" id="ay-grafikler">
+          <figure class="viz" id="grafik-sicaklik">
+            <figcaption><span class="viz-baslik">Sıcaklık (°C)</span><span class="viz-lejant" id="lejant-sicaklik"></span></figcaption>
+            <div class="viz-alan" tabindex="0" aria-label="Sıcaklık grafiği; ok tuşlarıyla gezinin"></div>
+          </figure>
+          <figure class="viz" id="grafik-ilerleme">
+            <figcaption><span class="viz-baslik">Baskı ilerlemesi (%)</span></figcaption>
+            <div class="viz-alan" tabindex="0" aria-label="İlerleme grafiği; ok tuşlarıyla gezinin"></div>
+          </figure>
+          <div class="viz-ipucu" id="viz-ipucu" hidden></div>
         </div>
         <h3>Durum ve bağlantı değişiklikleri</h3>
         <table class="tablo gecmis" id="ay-degisim-tablo">
