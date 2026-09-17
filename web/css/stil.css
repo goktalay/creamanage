@@ -202,8 +202,9 @@ progress#tarama-cubuk { width: 100%; height: 12px; }
 .bildirim { position: fixed; bottom: calc(var(--alt-yuk) + 12px); left: 50%; transform: translateX(-50%); background: var(--metin); color: var(--panel); padding: 8px 14px; border-radius: 8px; z-index: 20; font-size: 13px; max-width: 90vw; }
 
 /* ---------- giriş sayfası ---------- */
-.giris-sayfa { display: grid; place-items: center; min-height: 100vh; }
-.giris-kutu { background: var(--panel); border: 1px solid var(--kenar); border-radius: 12px; padding: 24px; width: min(400px, 92vw); box-shadow: var(--golge); }
+.giris-sayfa { display: grid; place-items: center; min-height: 100vh; position: relative; overflow: hidden; }
+.dunya { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.giris-kutu { position: relative; z-index: 1; background: color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter: blur(6px); border: 1px solid var(--kenar); border-radius: 12px; padding: 24px; width: min(400px, 92vw); box-shadow: 0 10px 30px rgba(0,0,0,.12); }
 .giris-kutu .marka { margin-bottom: 18px; }
 .giris-kutu .form { gap: 10px; }
 .giris-kutu .form h2 { margin: 6px 0 2px; }

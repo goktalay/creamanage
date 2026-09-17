@@ -9,6 +9,7 @@
 <script>try{var t=localStorage.getItem("creamanage.tema");if(t==="acik"||t==="koyu")document.documentElement.dataset.theme=t;}catch(e){}</script>
 </head>
 <body class="giris-sayfa">
+<canvas id="dunya" class="dunya" aria-hidden="true"></canvas>
 <main class="giris-kutu">
   <div class="marka">
     <img class="logo" src="/static/ikon.svg" alt="CreaManage">
@@ -56,6 +57,74 @@
     try { await api("/api/kurulum", { kullanici_adi: f.kullanici_adi.value.trim(), ad: f.ad.value.trim(), parola: f.parola.value }); location.href = "/"; }
     catch (err) { $("#kurulum-hata").textContent = err.message; }
   });
+})();
+</script>
+<script>
+/* Çizgisel, yumuşak renkli, sürekli dönen dünya (arka plan). Bağımlılık yok. */
+(function () {
+  const c = document.getElementById("dunya"), ctx = c.getContext("2d");
+  const azHareket = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W = 0, H = 0, R = 0, CX = 0, CY = 0, dpr = 1;
+  function boyutla() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = window.innerWidth; H = window.innerHeight; c.width = W * dpr; c.height = H * dpr;
+    c.style.width = W + "px"; c.style.height = H + "px"; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    R = Math.min(W, H) * 0.42; CX = W * 0.5; CY = H * 0.52;
+  }
+  window.addEventListener("resize", boyutla); boyutla();
+  const koyu = () => document.documentElement.dataset.theme === "koyu" || (document.documentElement.dataset.theme !== "acik" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const egim = 23.4 * Math.PI / 180;
+  // Kıta hatlarını taklit eden yumuşak "kara parçaları": enlem/boylam merkezli elipsler (çizgisel dokular)
+  const kara = [[38, 25, 22, 12], [-10, 25, 12, 14], [48, 12, 30, 16], [25, 80, 22, 14], [-25, 130, 12, 9], [10, -70, 16, 10], [-15, -60, 14, 18], [60, -100, 24, 20]];
+  function nokta(lat, lon, aci) {
+    const la = lat * Math.PI / 180, lo = lon * Math.PI / 180 + aci;
+    let x = Math.cos(la) * Math.sin(lo), y = Math.sin(la), z = Math.cos(la) * Math.cos(lo);
+    const y2 = y * Math.cos(egim) - z * Math.sin(egim), z2 = y * Math.sin(egim) + z * Math.cos(egim);
+    return { x: CX + x * R, y: CY - y2 * R, z: z2 };
+  }
+  function cizgi(pts, renk, kalinlik) {
+    ctx.beginPath(); let acik = false;
+    for (const p of pts) { if (p.z < -0.02) { acik = false; continue; } if (acik) ctx.lineTo(p.x, p.y); else ctx.moveTo(p.x, p.y); acik = true; }
+    ctx.strokeStyle = renk; ctx.lineWidth = kalinlik; ctx.stroke();
+  }
+  let aci = 0, son = performance.now();
+  function kare(simdi) {
+    const dt = Math.min(50, simdi - son); son = simdi;
+    aci += (azHareket ? 0.00002 : 0.00012) * dt;
+    ctx.clearRect(0, 0, W, H);
+    const k = koyu(), ana = k ? "rgba(120,160,255," : "rgba(31,95,191,", ikincil = k ? "rgba(200,120,255," : "rgba(240,90,60,";
+    // dış halka + yumuşak parlama
+    const g = ctx.createRadialGradient(CX, CY, R * 0.2, CX, CY, R * 1.25);
+    g.addColorStop(0, ana + (k ? "0.10)" : "0.06)")); g.addColorStop(1, ana + "0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(CX, CY, R * 1.25, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(CX, CY, R, 0, Math.PI * 2); ctx.strokeStyle = ana + "0.35)"; ctx.lineWidth = 1.2; ctx.stroke();
+    // enlemler
+    for (let lat = -75; lat <= 75; lat += 15) {
+      const pts = []; for (let lon = 0; lon <= 360; lon += 3) pts.push(nokta(lat, lon, aci));
+      cizgi(pts, ana + (lat === 0 ? "0.32)" : "0.16)"), lat === 0 ? 1.1 : 0.8);
+    }
+    // boylamlar
+    for (let lon = 0; lon < 360; lon += 20) {
+      const pts = []; for (let lat = -90; lat <= 90; lat += 3) pts.push(nokta(lat, lon, aci));
+      cizgi(pts, ana + "0.16)", 0.8);
+    }
+    // kara parçaları: çizgisel taramalı elipsler
+    for (const [lat0, lon0, rlat, rlon] of kara) {
+      for (let i = -2; i <= 2; i++) {
+        const pts = []; const lat = lat0 + i * rlat / 2.6;
+        const gen = rlon * Math.sqrt(Math.max(0, 1 - (i / 2.6) ** 2));
+        for (let t = -1; t <= 1.0001; t += 0.1) pts.push(nokta(lat, lon0 + t * gen, aci));
+        cizgi(pts, ikincil + "0.30)", 1.4);
+      }
+    }
+    // uydu yörüngesi ve nokta
+    const yor = []; for (let a = 0; a <= 360; a += 4) { const t = a * Math.PI / 180; const x = Math.cos(t) * 1.25, y = Math.sin(t) * 0.35, z = Math.sin(t) * 1.25; yor.push({ x: CX + (x * Math.cos(aci * 0.7) + z * Math.sin(aci * 0.7)) * R, y: CY - y * R, z: 1 }); }
+    cizgi(yor, ana + "0.18)", 0.8);
+    const u = (aci * 0.9) % (Math.PI * 2), ux = Math.cos(u) * 1.25, uz = Math.sin(u) * 1.25;
+    ctx.beginPath(); ctx.arc(CX + (ux * Math.cos(aci * 0.7) + uz * Math.sin(aci * 0.7)) * R, CY - Math.sin(u) * 0.35 * R, 3, 0, Math.PI * 2); ctx.fillStyle = ikincil + "0.8)"; ctx.fill();
+    requestAnimationFrame(kare);
+  }
+  requestAnimationFrame(kare);
 })();
 </script>
 </body>
