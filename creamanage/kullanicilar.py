@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import os
 import re
 import secrets
@@ -62,9 +63,18 @@ def yetkili_mi(rol: str, gerekli: str) -> bool:
 
 def gorunum(k: dict) -> dict:
     """Parola hash'i olmadan arayüze verilecek sözlük."""
+    try:
+        tercihler = json.loads(k.get("tercihler") or "{}")
+    except ValueError:
+        tercihler = {}
     return {"id": k["id"], "kullanici_adi": k["kullanici_adi"], "ad": k["ad"], "rol": k["rol"],
             "rol_adi": ROL_ADLARI.get(k["rol"], k["rol"]), "etkin": bool(k.get("etkin", 1)),
-            "olusturma": k.get("olusturma"), "son_giris": k.get("son_giris")}
+            "olusturma": k.get("olusturma"), "son_giris": k.get("son_giris"),
+            "tercihler": tercihler if isinstance(tercihler, dict) else {}}
+
+
+TEMALAR = ("acik", "koyu", "otomatik")
+IZINLI_TERCIHLER = {"tema": lambda v: v in TEMALAR, "modul": lambda v: isinstance(v, str) and len(v) <= 32}
 
 
 class KullaniciYonetimi:
@@ -140,6 +150,21 @@ class KullaniciYonetimi:
             raise ValueError(hata)
         self.vt.kullanici_guncelle(kullanici_id, parola_hash=parola_hashle(yeni))
         self.vt.oturumlari_sil(kullanici_id, haric_token)
+
+    def tercih_guncelle(self, kullanici_id: int, yeni: dict) -> dict:
+        """Kullanıcının kendi arayüz tercihleri (tema vb.); yalnız izinli anahtarlar."""
+        k = self.vt.kullanici(kullanici_id)
+        if k is None:
+            raise LookupError("kullanıcı bulunamadı")
+        mevcut = gorunum(k)["tercihler"]
+        for anahtar, deger in (yeni or {}).items():
+            dogrula = IZINLI_TERCIHLER.get(anahtar)
+            if dogrula is None or not dogrula(deger):
+                raise ValueError(f"geçersiz tercih: {anahtar}")
+            mevcut[anahtar] = deger
+        guncel = self.vt.kullanici_guncelle(kullanici_id, tercihler=json.dumps(mevcut, ensure_ascii=False))
+        assert guncel is not None
+        return gorunum(guncel)["tercihler"]
 
     def _etkin_yonetici_sayisi(self) -> int:
         return sum(1 for k in self.vt.kullanicilar() if k["rol"] == "sistem_yoneticisi" and k["etkin"])

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="620 340 620 750" width="620" height="750">
+  <defs>
+    <linearGradient id="ust" x1="840" y1="372" x2="1208" y2="372" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#7c3aed"/><stop offset=".55" stop-color="#2f8dff"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
+    <linearGradient id="ustOn" x1="885" y1="500" x2="1110" y2="500" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1b2e6e"/><stop offset="1" stop-color="#0b7fb8"/></linearGradient>
+    <linearGradient id="solAcik" x1="0" y1="556" x2="0" y2="871" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff5aa8"/><stop offset="1" stop-color="#ff6a2a"/></linearGradient>
+    <linearGradient id="solKoyu" x1="0" y1="603" x2="0" y2="823" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#b8267a"/><stop offset="1" stop-color="#c8402a"/></linearGradient>
+    <linearGradient id="ustCapraz" x1="656" y1="556" x2="840" y2="372" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff4fa0"/><stop offset="1" stop-color="#ff2f9a"/></linearGradient>
+    <linearGradient id="ustCaprazKoyu" x1="745" y1="603" x2="900" y2="532" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8b2ab5"/><stop offset="1" stop-color="#6d28d9"/></linearGradient>
+    <linearGradient id="altCapraz" x1="656" y1="871" x2="840" y2="1055" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff5a3c"/><stop offset="1" stop-color="#e83a5a"/></linearGradient>
+    <linearGradient id="altCaprazKoyu" x1="745" y1="823" x2="910" y2="895" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#c22e4a"/><stop offset="1" stop-color="#d9571c"/></linearGradient>
+    <linearGradient id="altAcik" x1="855" y1="930" x2="1110" y2="930" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#ff8a1e"/><stop offset="1" stop-color="#ffd23a"/></linearGradient>
+    <linearGradient id="altKoyu" x1="840" y1="1010" x2="1208" y2="1010" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#c8402a"/><stop offset="1" stop-color="#f28a12"/></linearGradient>
+  </defs>
+  <!-- üst kol -->
+  <polygon points="840,372 1208,372 1080,460 885,460" fill="url(#ust)"/>
+  <polygon points="885,460 1080,460 1110,532 900,532" fill="url(#ustOn)"/>
+  <polygon points="1208,372 1080,460 1110,532" fill="#19b4dc"/>
+  <!-- üst çapraz -->
+  <polygon points="840,372 885,460 745,603 656,556" fill="url(#ustCapraz)"/>
+  <polygon points="885,460 900,532 805,627 745,603" fill="url(#ustCaprazKoyu)"/>
+  <!-- dikey -->
+  <polygon points="656,556 745,603 745,823 656,871" fill="url(#solAcik)"/>
+  <polygon points="745,603 805,627 805,790 745,823" fill="url(#solKoyu)"/>
+  <!-- alt çapraz -->
+  <polygon points="656,871 745,823 855,965 840,1055" fill="url(#altCapraz)"/>
+  <polygon points="745,823 805,790 910,895 855,965" fill="url(#altCaprazKoyu)"/>
+  <!-- alt kol -->
+  <polygon points="910,895 1110,895 1080,965 855,965" fill="url(#altAcik)"/>
+  <polygon points="855,965 1080,965 1208,1055 840,1055" fill="url(#altKoyu)"/>
+  <polygon points="1110,895 1208,1055 1080,965" fill="#ffb020"/>
+</svg>

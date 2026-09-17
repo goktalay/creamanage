@@ -56,9 +56,28 @@
     return ((p[0] || "?")[0] + (p.length > 1 ? p[p.length - 1][0] : "")).toLocaleUpperCase("tr-TR");
   }
   function avatarRenk(metin) { let h = 0; for (const c of String(metin)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return `hsl(${h % 360} 45% 45%)`; }
+  // ---------- tema (gece/gündüz), kullanıcı hesabında saklanır ----------
+  function temaUygula(tema) {
+    if (tema === "acik" || tema === "koyu") document.documentElement.dataset.theme = tema;
+    else delete document.documentElement.dataset.theme;
+    try { if (tema === "acik" || tema === "koyu") localStorage.setItem("creamanage.tema", tema); else localStorage.removeItem("creamanage.tema"); } catch (e) { /* yok say */ }
+  }
+  function etkinTema() {
+    const t = document.documentElement.dataset.theme;
+    if (t === "acik" || t === "koyu") return t;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "koyu" : "acik";
+  }
+  async function temaDegistir() {
+    const yeni = etkinTema() === "koyu" ? "acik" : "koyu";
+    temaUygula(yeni);
+    try { await put("/api/ben/tercihler", { tema: yeni }); if (st.ben) st.ben.tercihler = Object.assign({}, st.ben.tercihler, { tema: yeni }); }
+    catch (e) { bildir("Tema tercihi kaydedilemedi: " + e.message); }
+  }
+  $("#btn-tema").addEventListener("click", temaDegistir);
   function rolUygula() {
     $$("[data-rol]").forEach(el => el.classList.toggle("yetkisiz", !yetkili(el.dataset.rol)));
     if (st.ben) {
+      const t = (st.ben.tercihler || {}).tema; if (t) temaUygula(t);
       $("#ben-ad").textContent = st.ben.ad || st.ben.kullanici_adi; $("#ben-rol").textContent = st.ben.rol_adi;
       const bh = basHarfler(st.ben.ad || st.ben.kullanici_adi), renk = avatarRenk(st.ben.kullanici_adi);
       $$("#avatar, #avatar-buyuk").forEach(a => { a.textContent = bh; a.style.setProperty("--avatar-renk", renk); });
@@ -133,12 +152,14 @@
       <div class="satir-bilgi"><span>${ilerleme == null ? "" : "%" + ilerleme}</span><span>${c.katman != null && c.toplam_katman ? `katman ${c.katman}/${c.toplam_katman}` : ""}</span><span>${c.kalan_sn != null && d === "basiyor" ? "kalan " + sure(c.kalan_sn) : ""}</span></div>
       <div class="sicaklik"><span>Nozul <b>${derece(c.nozul, c.nozul_hedef)}</b></span><span>Tabla <b>${derece(c.tabla, c.tabla_hedef)}</b></span><span>Kabin <b>${derece(c.kabin, c.kabin_hedef)}</b></span>${c.filament_yok ? '<span class="olay-kritik">Filament yok</span>' : ""}</div>`;
   }
+  const miniCubuk = (yuzde) => `<span class="mini-cubuk"><i style="width:${Math.max(0, Math.min(100, yuzde))}%"></i></span>`;
   function sadeSatirHtml(y) {
     const c = y.canli || {}, d = c.durum || "cevrimdisi";
-    const ilerleme = c.ilerleme != null && d !== "bosta" && d !== "cevrimdisi" ? "%" + Math.round(c.ilerleme) : "";
+    const aktif = c.ilerleme != null && d !== "bosta" && d !== "cevrimdisi";
+    const ilerleme = aktif ? Math.round(c.ilerleme) : null;
     return `<td class="ad" title="${kacis(y.ip)} · ${DURUM_AD[d] || d}">${kacis(y.ad)}</td>` +
       `<td title="${kacis(c.dosya_yolu || c.dosya || "")}">${c.dosya ? kacis(c.dosya) : '<span class="ipucu">–</span>'}</td>` +
-      `<td class="yuzde">${ilerleme}</td>`;
+      `<td class="yuzde">${ilerleme != null ? "%" + ilerleme + miniCubuk(ilerleme) : ""}</td>`;
   }
   function cizSade() {
     $("#sade tbody").innerHTML = filtreli().map(y => {
@@ -171,10 +192,10 @@
     if (yk) orta = `<div class="dosya-metin">${kacis(yk.metin)}<progress max="100" value="${yk.yuzde}"></progress></div>`;
     else if (yetkiliMi) orta = `<button type="button" class="dosya-btn ${bos ? "bos" : ""}" ${d === "cevrimdisi" ? "disabled" : ""} title="${kacis(c.dosya_yolu || "")}">${bos ? "Dosya seç ve yazdır" : kacis(c.dosya)}<small>${d === "cevrimdisi" ? "yazıcı çevrimdışı" : (bos ? "" : "değiştirmek için tıklayın")}</small></button>`;
     else orta = `<div class="dosya-metin" title="${kacis(c.dosya_yolu || "")}">${bos ? '<span class="ipucu">–</span>' : kacis(c.dosya)}</div>`;
-    const ilerleme = c.ilerleme != null && (d === "basiyor" || d === "duraklatildi") ? "%" + Math.round(c.ilerleme) : "";
+    const aktif = c.ilerleme != null && (d === "basiyor" || d === "duraklatildi"), ilerleme = aktif ? Math.round(c.ilerleme) : null;
     return `<div class="bas"><span title="${kacis(y.ad)}">${kacis(y.ad)}</span><span class="durum">${DURUM_AD[d] || d}</span></div>
       <div class="orta">${orta}</div>
-      <div class="alt"><span>${kacis(y.ip)}</span><span>${ilerleme}${y.grup ? (ilerleme ? " · " : "") + kacis(y.grup) : ""}</span></div>`;
+      <div class="alt"><div class="alt-satir"><span>${kacis(y.ip)}</span><span>${ilerleme != null ? "%" + ilerleme : ""}${y.grup ? (ilerleme != null ? " · " : "") + kacis(y.grup) : ""}</span></div>${ilerleme != null ? miniCubuk(ilerleme) : ""}</div>`;
   }
   function cizYukle() {
     $("#yukle").innerHTML = filtreli().map(y => {
@@ -250,21 +271,69 @@
       $("#ay-olaylar").innerHTML = v.olaylar.map(o => `<li class="olay-${o.seviye}"><time>${saat(o.zaman)}</time>${kacis(o.mesaj)}</li>`).join("") || "<li class='ipucu'>Olay yok.</li>";
     } catch (e) { bildir(e.message); }
   }
+  // Çizgisel SVG ikonlar (24x24, stroke)
+  const IK = (yol) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${yol}</svg>`;
+  const IKON = {
+    printer: IK('<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M6 15h12v6H6z"/><circle cx="17.5" cy="12.5" r=".8" fill="currentColor"/>'),
+    file: IK('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>'),
+    progress: IK('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 9 9" stroke-width="3"/>'),
+    layers: IK('<path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/><path d="m3 17 9 5 9-5"/>'),
+    clock: IK('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+    hourglass: IK('<path d="M7 3h10M7 21h10"/><path d="M8 3v3a4 4 0 0 0 8 0V3M8 21v-3a4 4 0 0 1 8 0v3"/><path d="M8 6c0 3 4 5 4 6s-4 3-4 6M16 6c0 3-4 5-4 6s4 3 4 6"/>'),
+    gauge: IK('<path d="M4 15a8 8 0 1 1 16 0"/><path d="m12 15 4-5"/><circle cx="12" cy="15" r="1.4" fill="currentColor"/>'),
+    nozzle: IK('<path d="M9 3h6v8l3 3v2H6v-2l3-3z"/><path d="M11 16v3M13 16v3"/><path d="M12 19v2"/>'),
+    bed: IK('<rect x="3" y="14" width="18" height="4" rx="1"/><path d="M6 14v-3M12 14v-3M18 14v-3"/><path d="M7 7c1 1 1 2 0 3M12 7c1 1 1 2 0 3M17 7c1 1 1 2 0 3"/>'),
+    box: IK('<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/>'),
+    fan: IK('<circle cx="12" cy="12" r="2"/><path d="M12 10c0-3-1.5-6-4-6S6 8 9 10"/><path d="M14 12c3 0 6-1.5 6-4s-4-2-6 1"/><path d="M12 14c0 3 1.5 6 4 6s2-4-1-6"/><path d="M10 12c-3 0-6 1.5-6 4s4 2 6-1"/>'),
+    bulb: IK('<path d="M9 18h6M10 21h4"/><path d="M8 13a6 6 0 1 1 8 0c-1 1-1.5 2-1.5 3h-5c0-1-.5-2-1.5-3z"/>'),
+    'bulb-off': IK('<path d="M9 18h6M10 21h4"/><path d="M8 13a6 6 0 1 1 8 0c-1 1-1.5 2-1.5 3h-5c0-1-.5-2-1.5-3z"/><path d="m4 4 16 16"/>'),
+    spool: IK('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4v5M12 15v5M4 12h5M15 12h5"/>'),
+    wifi: IK('<path d="M2 8.5a16 16 0 0 1 20 0"/><path d="M5.5 12a11 11 0 0 1 13 0"/><path d="M9 15.5a5.5 5.5 0 0 1 6 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/>'),
+    alert: IK('<path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17.5v.5"/>'),
+    check: IK('<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>'),
+    cpu: IK('<rect x="5" y="5" width="14" height="14" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>'),
+    hash: IK('<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>'),
+    pause: IK('<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>'),
+    play: IK('<path d="M6 4v16l14-8-14-8z"/>'),
+    x: IK('<path d="M6 6l12 12M18 6 6 18"/>'),
+    tag: IK('<path d="M3 12V4h8l10 10-8 8L3 12z"/><circle cx="7.5" cy="8.5" r="1.2" fill="currentColor"/>'),
+  };
+  $$(".ki[data-ikon]").forEach(el => { el.innerHTML = IKON[el.dataset.ikon] || ""; });
+  function bilgiKart(ikon, etiket, deger, secenek) {
+    const o = secenek || {}, renk = o.renk ? `style="--renk: ${o.renk}"` : "";
+    const bos = deger == null || deger === "";
+    return `<div class="bilgi-kart ${o.genis ? "genis" : ""} ${bos && o.pasifBos !== false ? "pasif" : ""}" ${renk} title="${kacis(o.ipucu || "")}">
+      <span class="bk-ikon">${IKON[ikon] || ""}</span>
+      <span class="bk-etiket">${kacis(etiket)}</span>
+      <span class="bk-deger">${bos ? "–" : kacis(deger)}${o.alt ? `<small>${kacis(o.alt)}</small>` : ""}</span>
+      ${o.yuzde != null ? `<span class="bk-cubuk"><i style="width:${Math.max(0, Math.min(100, o.yuzde))}%"></i></span>` : ""}
+    </div>`;
+  }
   function ayrintiDoldur(y) {
-    const c = y.canli || {};
-    $("#ay-baslik").textContent = `${y.ad} — ${y.ip}`;
-    const alan = (k, v, ipucu) => `<div title="${kacis(ipucu || "")}"><span>${k}</span>${v == null || v === "" ? "–" : kacis(v)}</div>`;
-    $("#ay-alanlar").innerHTML = [
-      alan("Durum", DURUM_AD[c.durum] || c.durum), alan("Bağlantı", c.baglanti),
-      alan("Model", c.model || y.model), alan("Hostname", c.hostname || y.hostname),
-      alan("Dosya", c.dosya, c.dosya_yolu), alan("İlerleme", c.ilerleme != null ? "%" + Math.round(c.ilerleme) : null),
-      alan("Katman", c.katman != null ? `${c.katman} / ${c.toplam_katman || "?"}` : null), alan("Kalan süre", c.kalan_sn != null ? sure(c.kalan_sn) : null),
-      alan("Geçen süre", c.gecen_sn != null ? sure(c.gecen_sn) : null), alan("Hız", c.hiz_yuzde != null ? "%" + c.hiz_yuzde : null),
-      alan("Nozul", derece(c.nozul, c.nozul_hedef)), alan("Tabla", derece(c.tabla, c.tabla_hedef)),
-      alan("Kabin", derece(c.kabin, c.kabin_hedef)), alan("Fan", c.fan != null ? "%" + c.fan : null),
-      alan("Işık", c.isik == null ? null : (c.isik ? "Açık" : "Kapalı")), alan("CFS", c.cfs_bagli ? "Bağlı" : "Yok"),
-      alan("Ham state", c.state_kodu), alan("Hata", c.hata_kodu ? `${c.hata_kodu} ${c.hata_anahtari || ""}` : "Yok"),
-      alan("Son veri", c.son_veri ? saat(c.son_veri) : null), alan("Son hata", c.son_hata),
+    const c = y.canli || {}, d = c.durum || "cevrimdisi", renk = `var(--d-${d})`;
+    $("#ay-baslik").textContent = y.ad;
+    $("#ay-altbaslik").textContent = [y.ip, c.model || y.model, c.hostname || y.hostname, y.grup].filter(Boolean).join(" · ");
+    $("#ay-ikon").innerHTML = IKON.printer; $("#ay-ikon").style.setProperty("--renk", renk);
+    const dr = $("#ay-durum"); dr.textContent = DURUM_AD[d] || d; dr.style.setProperty("--renk", renk);
+    const isitiyor = (v, h) => (h && v != null && v < h - 2) ? "var(--d-duraklatildi)" : (h ? "var(--d-hata)" : "var(--soluk)");
+    const ilerleme = c.ilerleme != null ? Math.round(c.ilerleme) : null;
+    $("#ay-kartlar").innerHTML = [
+      bilgiKart("file", "Dosya", c.dosya, { genis: true, ipucu: c.dosya_yolu, pasifBos: true }),
+      bilgiKart("progress", "İlerleme", ilerleme != null ? "%" + ilerleme : null, { yuzde: ilerleme, renk, alt: c.katman != null && c.toplam_katman ? `katman ${c.katman} / ${c.toplam_katman}` : "" }),
+      bilgiKart("hourglass", "Kalan süre", c.kalan_sn != null && d !== "bosta" ? sure(c.kalan_sn) : null, { renk: "var(--birincil)" }),
+      bilgiKart("clock", "Geçen süre", c.gecen_sn != null && d !== "bosta" ? sure(c.gecen_sn) : null, { renk: "var(--birincil)" }),
+      bilgiKart("nozzle", "Nozul", c.nozul != null ? Number(c.nozul).toFixed(0) + "°" : null, { alt: c.nozul_hedef ? `hedef ${Number(c.nozul_hedef).toFixed(0)}°` : "hedef yok", renk: isitiyor(c.nozul, c.nozul_hedef) }),
+      bilgiKart("bed", "Tabla", c.tabla != null ? Number(c.tabla).toFixed(0) + "°" : null, { alt: c.tabla_hedef ? `hedef ${Number(c.tabla_hedef).toFixed(0)}°` : "hedef yok", renk: isitiyor(c.tabla, c.tabla_hedef) }),
+      bilgiKart("box", "Kabin", c.kabin != null ? Number(c.kabin).toFixed(0) + "°" : null, { alt: c.kabin_hedef ? `hedef ${Number(c.kabin_hedef).toFixed(0)}°` : "", renk: isitiyor(c.kabin, c.kabin_hedef) }),
+      bilgiKart("fan", "Fan", c.fan != null ? "%" + c.fan : null, { renk: c.fan ? "var(--d-tamamlandi)" : "var(--soluk)", yuzde: c.fan != null ? Number(c.fan) : null }),
+      bilgiKart("gauge", "Hız", c.hiz_yuzde != null ? "%" + c.hiz_yuzde : null, { renk: "var(--d-hazirlaniyor)", yuzde: c.hiz_yuzde != null ? Math.min(100, Number(c.hiz_yuzde)) : null }),
+      bilgiKart(c.isik ? "bulb" : "bulb-off", "Işık", c.isik == null ? null : (c.isik ? "Açık" : "Kapalı"), { renk: c.isik ? "var(--d-duraklatildi)" : "var(--soluk)" }),
+      bilgiKart("spool", "CFS", c.cfs_bagli ? "Bağlı" : "Yok", { renk: c.cfs_bagli ? "var(--d-basiyor)" : "var(--soluk)", pasifBos: false }),
+      bilgiKart("wifi", "Bağlantı", c.baglanti === "bagli" ? "Bağlı" : (c.baglanti === "baglaniyor" ? "Bağlanıyor" : "Kopuk"), { alt: c.son_veri ? "son veri " + saat(c.son_veri) : (c.son_hata || ""), renk: c.baglanti === "bagli" ? "var(--d-basiyor)" : "var(--d-hata)", pasifBos: false }),
+      bilgiKart(c.hata_kodu ? "alert" : "check", "Hata", c.hata_kodu ? `${c.hata_kodu}` : "Yok", { alt: c.hata_kodu ? (c.hata_anahtari || "") : "sorun bildirilmedi", renk: c.hata_kodu ? "var(--d-hata)" : "var(--d-basiyor)", pasifBos: false }),
+      bilgiKart("hash", "Ham durum", c.state_kodu != null ? String(c.state_kodu) : null, { alt: c.device_state != null ? `deviceState ${c.device_state}` : "", renk: "var(--soluk)" }),
+      bilgiKart("cpu", "Model", c.model || y.model, { alt: c.model_surum || "", renk: "var(--soluk)" }),
+      bilgiKart("tag", "Grup", y.grup, { alt: y.notlar || "", renk: "var(--soluk)" }),
     ].join("");
     const ipucu = { basiyor: "Baskı sürüyor: Durdur ile duraklatabilir, İptal Et ile sonlandırabilirsiniz.",
       duraklatildi: "Baskı duraklatıldı: Başlat ile sürdürün ya da İptal Et ile sonlandırın.",

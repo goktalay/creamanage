@@ -6,7 +6,7 @@ Creality **K2 Plus (Combo)** 3D yazıcı filosunu (hedef: 56 cihaz) yerel ağ ü
 Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sunduğu
 **WebSocket 9999** arayüzü kullanılır (root, Moonraker, bulut yok). Garanti korunur.
 
-## Sürüm 0.4.0 — ne yapar
+## Sürüm 0.5.0 — ne yapar
 
 - **Kullanıcı girişi ve roller:** herkes kullanıcı adı ve parola ile girer. Üç rol:
   **Sistem Yöneticisi** (her şey + kullanıcı yönetimi, işlem geçmişi, bildirim ayarları),
@@ -29,6 +29,10 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
   kaydırılan modül alanı, sabit alt çubukta durum sayaçları. Modüller: Yazıcılar (kartlar),
   Dosya Listesi (satırlar), Dosya Yöneticisi (yükle ve yazdır), Olaylar; sistem yöneticisine
   ek olarak Bildirimler ve Kullanıcılar.
+- **Gece / gündüz teması:** üst çubuktaki güneş/ay düğmesiyle; tercih kullanıcı hesabına
+  kaydedilir (her cihazda aynı), seçilmemişse işletim sistemi teması izlenir.
+- **Yazıcı ayrıntısı:** ikonlu bilgi kartları (dosya, ilerleme, süreler, sıcaklıklar, fan,
+  hız, ışık, CFS, bağlantı, hata, model, grup), ikonlu komut çubuğu, ayarlar ve son olaylar.
 - **Canlı gösterge paneli:** her yazıcı için durum (basıyor / boşta / duraklatıldı /
   tamamlandı / hata / hazırlanıyor / çevrimdışı), dosya, ilerleme, katman, kalan süre,
   nozul/tabla/kabin sıcaklıkları. Durum sayaçları, arama, durum ve grup filtresi.
@@ -146,7 +150,7 @@ testler/           birim ve uçtan uca testler
 | Uç | İşlev |
 |---|---|
 | `GET /api/kurulum`, `POST /api/kurulum` | ilk yönetici kurulumu (yalnız kullanıcı yokken) |
-| `POST /api/giris`, `POST /api/cikis`, `GET /api/ben`, `PUT /api/ben/parola` | oturum |
+| `POST /api/giris`, `POST /api/cikis`, `GET /api/ben`, `PUT /api/ben/parola`, `PUT /api/ben/tercihler` | oturum, kendi parolası ve tercihleri (tema) |
 | `GET/POST /api/kullanicilar`, `PUT/DELETE /api/kullanicilar/{id}` | kullanıcı yönetimi (sistem yöneticisi) |
 | `GET /api/kullanicilar/{id}/gecmis`, `GET /api/kullanicilar/gecmis` | işlem geçmişi (sistem yöneticisi) |
 | `GET /api/surum` | ürün, sürüm, firma |

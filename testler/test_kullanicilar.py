@@ -181,6 +181,13 @@ class ApiTesti(unittest.IsolatedAsyncioTestCase):
         r = await yy.put("/api/ben/parola", json={"eski": "yanlis", "yeni": "yenip4rola!"}); self.assertEqual(r.status, 400)
         r = await yy.put("/api/ben/parola", json={"eski": PAROLA, "yeni": "yenip4rola!"}); self.assertEqual(r.status, 200)
         r = await yy.get("/api/ben"); self.assertEqual(r.status, 200)       # kendi oturumu korunur
+        # Tercihler (tema) kullanıcıya bağlı saklanır; gözetmen dahil herkes kendi tercihini yazar
+        r = await goz2.put("/api/ben/tercihler", json={"tema": "koyu"}) if False else await admin.put("/api/ben/tercihler", json={"tema": "koyu"})
+        self.assertEqual(r.status, 200); self.assertEqual((await r.json())["tercihler"]["tema"], "koyu")
+        r = await admin.get("/api/ben"); self.assertEqual((await r.json())["kullanici"]["tercihler"]["tema"], "koyu")
+        r = await admin.put("/api/ben/tercihler", json={"tema": "mor"}); self.assertEqual(r.status, 400)
+        r = await admin.put("/api/ben/tercihler", json={"parola_hash": "x"}); self.assertEqual(r.status, 400)
+        r = await yy.get("/api/ben"); self.assertNotIn("tema", (await r.json())["kullanici"]["tercihler"])   # başka kullanıcıyı etkilemez
         # Denetim kaydı: yazıcı yöneticisinin geçmişi
         yy_id = next(k["id"] for k in v["kullanicilar"] if k["kullanici_adi"] == "yyon")
         r = await admin.get(f"/api/kullanicilar/{yy_id}/gecmis"); self.assertEqual(r.status, 200)

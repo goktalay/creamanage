@@ -83,6 +83,9 @@ class Veritabani:
                              ("gcode_dizini", "TEXT NOT NULL DEFAULT ''")):
             if sutun not in mevcut:
                 self._bag.execute(f"ALTER TABLE yazicilar ADD COLUMN {sutun} {tanim}")
+        mevcut_k = {s[1] for s in self._bag.execute("PRAGMA table_info(kullanicilar)").fetchall()}
+        if "tercihler" not in mevcut_k:
+            self._bag.execute("ALTER TABLE kullanicilar ADD COLUMN tercihler TEXT NOT NULL DEFAULT '{}'")
         self._bag.commit()
 
     def kapat(self) -> None:
@@ -209,7 +212,7 @@ class Veritabani:
         return k
 
     def kullanici_guncelle(self, kullanici_id: int, **alanlar) -> dict | None:
-        izinli = {"ad", "rol", "parola_hash", "etkin", "son_giris", "kullanici_adi"}
+        izinli = {"ad", "rol", "parola_hash", "etkin", "son_giris", "kullanici_adi", "tercihler"}
         alanlar = {k: v for k, v in alanlar.items() if k in izinli}
         if alanlar:
             sql = ", ".join(f"{k}=?" for k in alanlar)

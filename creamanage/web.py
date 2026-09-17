@@ -58,7 +58,7 @@ def gerekli_rol(yontem: str, yol: str) -> str:
     """Her istek için en düşük yeterli rol."""
     if yol.startswith("/api/kullanicilar") or yol.startswith("/api/ayarlar"):
         return "sistem_yoneticisi"
-    if yol in ("/api/cikis", "/api/ben", "/api/ben/parola"):
+    if yol in ("/api/cikis", "/api/ben", "/api/ben/parola", "/api/ben/tercihler"):
         return "gozetmen"
     if yontem in ("POST", "PUT", "DELETE", "PATCH"):
         return "yazici_yoneticisi"
@@ -173,6 +173,14 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
             return _hata(str(e))
         _denetim(istek, "parola_degistirdi", "", "kendi parolası")
         return _json({"degisti": True})
+
+    async def ben_tercihler(istek):
+        v = await _govde(istek)
+        try:
+            t = ky.tercih_guncelle(istek["kullanici"]["id"], v)
+        except ValueError as e:
+            return _hata(str(e))
+        return _json({"tercihler": t})
 
     # --- kullanıcı yönetimi (yalnız sistem yöneticisi; rol denetimi ara katmanda) ---
     async def kullanici_listesi(_):
@@ -487,6 +495,7 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
     app.router.add_post("/api/cikis", cikis)
     app.router.add_get("/api/ben", ben)
     app.router.add_put("/api/ben/parola", ben_parola)
+    app.router.add_put("/api/ben/tercihler", ben_tercihler)
     app.router.add_get("/api/kullanicilar", kullanici_listesi)
     app.router.add_post("/api/kullanicilar", kullanici_ekle)
     app.router.add_put(r"/api/kullanicilar/{id:\d+}", kullanici_guncelle)
