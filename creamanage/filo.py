@@ -8,7 +8,7 @@ from typing import Awaitable, Callable
 
 from . import k2_protokol as P
 from .k2_baglanti import YaziciBaglantisi
-from .olaylar import (O_YAZICI_EKLENDI, O_YAZICI_SILINDI, SEVIYE, OlayMerkezi,
+from .olaylar import (O_DIS_MUDAHALE, O_YAZICI_EKLENDI, O_YAZICI_SILINDI, SEVIYE, OlayMerkezi,
                       gecis_olaylari)
 from .tarayici import Tarama, yerel_aglar
 from .veritabani import Veritabani
@@ -17,13 +17,15 @@ from . import yukleme as Y
 log = logging.getLogger("creamanage.filo")
 
 YAYIN_ARALIGI_SN = 1.0   # bir yazıcı için arayüze en sık yayın aralığı
+KOMUT_PENCERESI_SN = 120.0   # sistemden verilen komut bu süre içinde etkisini göstermeli
 
 Yayinci = Callable[[dict], Awaitable[None] | None]
 
 
 class Filo:
-    def __init__(self, vt: Veritabani) -> None:
+    def __init__(self, vt: Veritabani, telemetri=None) -> None:
         self.vt = vt
+        self.telemetri = telemetri      # TelemetriKayit (isteğe bağlı)
         self.olaylar = OlayMerkezi()
         self.baglantilar: dict[int, YaziciBaglantisi] = {}
         self.kayitlar: dict[int, dict] = {}
@@ -33,6 +35,7 @@ class Filo:
         self._yayincilar: list[Yayinci] = []
         self.tarama: Tarama | None = None
         self._tarama_gorevi: asyncio.Task | None = None
+        self.son_komut: dict[int, tuple[str, float, str]] = {}   # yid → (komut, zaman, kullanıcı)
 
     # --- yaşam döngüsü ---
     async def baslat(self) -> None:
@@ -41,8 +44,12 @@ class Filo:
             if k.get("etkin", 1):
                 self._baglanti_kur(k)
         log.info("%d yazıcı yüklendi", len(self.kayitlar))
+        if self.telemetri:
+            self.telemetri.baslat(self)
 
     async def durdur(self) -> None:
+        if self.telemetri:
+            await self.telemetri.durdur()
         for th in self._bekleyen_yayin.values():
             th.cancel()
         self._bekleyen_yayin.clear()
@@ -101,8 +108,31 @@ class Filo:
                 self.kayitlar[yid] = k
         for tur, mesaj, veri in gecis_olaylari(kayit["ad"], eski, yeni):
             await self._olay(tur, mesaj, yid, veri)
+        mudahale = self._dis_mudahale(yid, eski, yeni)
+        if mudahale:
+            await self._olay(O_DIS_MUDAHALE, f"{kayit['ad']}: {mudahale}", yid,
+                             {"dosya": (eski or {}).get("dosya") or yeni.get("dosya") or "", "ilerleme": (eski or {}).get("ilerleme")})
         self._son_ozet[yid] = yeni
         self._yayin_planla(yid)
+
+    def _sistem_komutu_var_mi(self, yid: int, *komutlar: str) -> bool:
+        k = self.son_komut.get(yid)
+        return bool(k and k[0] in komutlar and time.time() - k[1] <= KOMUT_PENCERESI_SN)
+
+    def _dis_mudahale(self, yid: int, eski: dict | None, yeni: dict) -> str:
+        """Baskı sistemden komut verilmeden durdu/iptal edildiyse (yazıcı ekranından) metin döner."""
+        if not eski or not eski.get("veri_var") or eski.get("baglanti") != "bagli" or yeni.get("baglanti") != "bagli":
+            return ""
+        e, y = eski.get("durum"), yeni.get("durum")
+        if e == y:
+            return ""
+        if e == P.D_BASIYOR and y == P.D_DURAKLATILDI and not self._sistem_komutu_var_mi(yid, "duraklat"):
+            return f"baskı YAZICIDAN durduruldu (sistem dışı müdahale) — {eski.get('dosya') or ''} %{int(eski.get('ilerleme') or 0)}"
+        ilerleme = eski.get("ilerleme")
+        iptal_gibi = y in (P.D_BOSTA,) or (y == P.D_TAMAMLANDI and ilerleme is not None and ilerleme < 100)
+        if e in (P.D_BASIYOR, P.D_DURAKLATILDI) and iptal_gibi and not self._sistem_komutu_var_mi(yid, "durdur", "baski_baslat"):
+            return f"baskı YAZICIDAN iptal edildi (sistem dışı müdahale) — {eski.get('dosya') or ''} %{int(ilerleme or 0)}"
+        return ""
 
     def _yayin_planla(self, yid: int) -> None:
         """Yazıcı başına en fazla saniyede bir arayüz yayını (56 yazıcı için hafif)."""
@@ -194,14 +224,17 @@ class Filo:
         if th:
             th.cancel()
         self.vt.yazici_sil(yid)
+        if self.telemetri:
+            self.telemetri.kapat(yid)
         await self._olay(O_YAZICI_SILINDI, f"{kayit['ad']} ({kayit['ip']}) silindi", None)
         await self._yayinla({"tur": "yazici_silindi", "id": yid})
         return True
 
-    async def komut(self, yid: int, ad: str, deger=None) -> bool:
+    async def komut(self, yid: int, ad: str, deger=None, kullanici: str = "") -> bool:
         b = self.baglantilar.get(yid)
         if b is None:
             return False
+        self.son_komut[yid] = (ad, time.time(), kullanici)
         sonuc = await b.komut(ad, deger)
         kayit = self.kayitlar.get(yid, {})
         await self._olay("komut", f"{kayit.get('ad', yid)}: {ad} komutu gönderildi"
@@ -225,6 +258,7 @@ class Filo:
         baslatildi = False
         if baslat:
             b = self.baglantilar.get(yid)
+            self.son_komut[yid] = ("baski_baslat", time.time(), kullanici)
             baslatildi = bool(b and await b.komut("baski_baslat", yol))
             await self._olay("baski_baslatildi" if baslatildi else "komut",
                              f"{kayit['ad']}: baskı başlatma komutu {'gönderildi' if baslatildi else 'GÖNDERİLEMEDİ (bağlı değil)'} {sonuc['dosya_adi']}",

@@ -223,3 +223,26 @@ progress#tarama-cubuk { width: 100%; height: 12px; }
 .sade td.yuzde { width: 130px; }
 .ykart .alt { flex-direction: column; gap: 4px; align-items: stretch; }
 .ykart .alt .alt-satir { display: flex; justify-content: space-between; }
+
+/* ---------- tam ekran modal (yazıcı ayrıntısı) ---------- */
+.modal.tam { width: min(1180px, 100%); height: min(92vh, 900px); padding: 0; display: grid; grid-template-rows: auto 1fr auto; overflow: hidden; }
+.tam-ust { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--kenar); background: var(--ust); }
+.tam-ust-sag { display: flex; align-items: center; gap: 6px; position: relative; }
+.tam-ust-sag .acilir.uygulamalar { top: 44px; right: 80px; }
+.tam-govde { overflow: auto; padding: 14px 16px; }
+.tam-alt { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--kenar); background: var(--ust); font-size: 12px; }
+.ay-modul.dar { max-width: 640px; }
+.islem-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.islem-kart { background: var(--arka); border: 1px solid var(--kenar); border-radius: 12px; padding: 14px; }
+.islem-kart h3 { margin: 0 0 10px; }
+.gecmis-arac { flex-wrap: wrap; margin-bottom: 6px; }
+.gecmis-arac label { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--soluk); }
+.tablo-kaydir { max-height: 46vh; overflow: auto; border: 1px solid var(--kenar); border-radius: 8px; }
+.tablo-kaydir .tablo th { position: sticky; top: 0; background: var(--panel); }
+.alanlar-kucuk { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin: 6px 0; }
+.hata-simdi { display: flex; gap: 12px; align-items: center; }
+.hata-simdi .bk-ikon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--renk) 16%, transparent); color: var(--renk); }
+.hata-simdi .bk-ikon svg { width: 26px; height: 26px; }
+
+.olay-major { color: var(--tehlike); font-weight: 600; }
+.olay-major::before { content: "🚨 "; }

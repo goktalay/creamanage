@@ -261,17 +261,85 @@
   }
 
   // ---------- ayrıntı ----------
+  // ---------- yazıcı ayrıntısı: modüller ----------
+  const AY_MODULLER = { durum: "Durum Bilgisi", islemler: "İşlemler", hatalar: "Yazıcı Hataları", gecmis: "Geçmiş", ayarlar: "Yazıcı Ayarları" };
+  let ayModul = "durum";
+  function ayMenuKapat() { $("#ay-menu").hidden = true; $("#ay-menu-btn").classList.remove("acik"); }
+  function ayModulAc(ad) {
+    const btn = $(`.uyg[data-ay-modul="${ad}"]`);
+    if (!AY_MODULLER[ad] || (btn && btn.dataset.rol && !yetkili(btn.dataset.rol))) ad = "durum";
+    ayModul = ad; ayMenuKapat();
+    Object.keys(AY_MODULLER).forEach(m => { $("#ay-modul-" + m).hidden = m !== ad; });
+    $$(".uyg[data-ay-modul]").forEach(b => b.classList.toggle("aktif", b.dataset.ayModul === ad));
+    const y = st.yazicilar.get(st.acikYazici); if (!y) return;
+    if (ad === "hatalar") ayHatalarYukle(y.id);
+    if (ad === "gecmis") ayGecmisYukle(y.id);
+  }
+  $("#ay-menu-btn").addEventListener("click", (e) => { e.stopPropagation(); const m = $("#ay-menu"), acik = m.hidden; ayMenuKapat(); m.hidden = !acik; $("#ay-menu-btn").classList.toggle("acik", acik); });
+  $$(".uyg[data-ay-modul]").forEach(b => b.addEventListener("click", () => ayModulAc(b.dataset.ayModul)));
+  document.addEventListener("click", (e) => { if (!e.target.closest("#ay-menu") && !e.target.closest("#ay-menu-btn")) ayMenuKapat(); });
   async function ayrintiAc(id) {
     st.acikYazici = id;
     const y = st.yazicilar.get(id); if (!y) return;
     ayrintiDoldur(y);
     ac("ortu-ayrinti");
+    ayModulAc(ayModul);
     try {
       const v = await api(`/api/yazicilar/${id}`);
+      st.ayHata = v.hata || null;
       $("#ay-olaylar").innerHTML = v.olaylar.map(o => `<li class="olay-${o.seviye}"><time>${saat(o.zaman)}</time>${kacis(o.mesaj)}</li>`).join("") || "<li class='ipucu'>Olay yok.</li>";
+      if (ayModul === "durum") ayrintiDoldur(y);
     } catch (e) { bildir(e.message); }
   }
-  // Çizgisel SVG ikonlar (24x24, stroke)
+  const ALAN_AD = { durum: "Durum", baglanti: "Bağlantı", hata_kodu: "Hata kodu", dosya: "Dosya", ip: "IP adresi", filament_yok: "Filament", son_hata: "Bağlantı hatası" };
+  const degerAd = (alan, v) => v == null || v === "None" ? "–" : (alan === "durum" ? (DURUM_AD[v] || v) : (alan === "baglanti" ? ({ bagli: "Bağlı", baglaniyor: "Bağlanıyor", kopuk: "Kopuk" }[v] || v) : (alan === "filament_yok" ? (v === "1" ? "Bitti" : "Var") : v)));
+  async function ayHatalarYukle(id) {
+    const y = st.yazicilar.get(id), c = (y && y.canli) || {};
+    const kap = $("#ay-hata-simdi");
+    if (c.hata_kodu) {
+      const h = st.ayHata || { metin: `kod ${c.hata_kodu}`, bilinen: false };
+      kap.innerHTML = `<div class="hata-simdi" style="--renk: var(--d-hata)"><span class="bk-ikon">${IKON.alert}</span><div><b>Şu an hata bildiriyor: ${kacis(h.metin)}</b>
+        <div class="ipucu">Kod ${kacis(h.kod || c.hata_anahtari || c.hata_kodu)}${h.sinif ? " · " + kacis(h.sinif) : ""}${h.modul ? " · " + kacis(h.modul) : ""}</div>
+        ${h.aciklama ? `<div>${kacis(h.aciklama)}</div>` : ""}${h.cozum ? `<div class="ipucu"><b>Çözüm:</b> ${kacis(h.cozum)}</div>` : ""}
+        ${h.bilinen ? "" : `<div class="ipucu">Bu kodun açıklaması tabloda yok. Sunucuda <code>python araclar/hata_kodlari_al.py</code> ile Creality tablosunu indirin.</div>`}</div></div>`;
+    } else kap.innerHTML = `<div class="hata-simdi" style="--renk: var(--d-basiyor)"><span class="bk-ikon">${IKON.check}</span><div><b>Şu an hata yok</b><div class="ipucu">Yazıcı sorun bildirmiyor.</div></div></div>`;
+    try {
+      const v = await api(`/api/yazicilar/${id}/hatalar`);
+      const satirlar = [];
+      v.hatalar.forEach(h => satirlar.push({ z: h.zaman, olay: h.basladi ? "Hata başladı" : "Hata geçti", kod: h.basladi ? h.yeni : (h.eski || ""), ayrinti: h.basladi ? ((h.aciklama && h.aciklama.metin) || h.baglam || "") : "", kritik: h.basladi }));
+      v.olaylar.forEach(o => satirlar.push({ z: o.zaman, olay: EYLEM_OLAY[o.tur] || o.tur, kod: (o.veri && o.veri.kod) || "", ayrinti: o.mesaj, kritik: o.seviye === "kritik" || o.seviye === "major" }));
+      satirlar.sort((a, b) => b.z - a.z);
+      $("#ay-hata-tablo tbody").innerHTML = satirlar.slice(0, 300).map(r => `<tr class="${r.kritik ? "kritik" : ""}"><td class="zaman">${new Date(r.z * 1000).toLocaleString("tr-TR")}</td><td class="eylem">${kacis(r.olay)}</td><td>${kacis(r.kod)}</td><td>${kacis(r.ayrinti)}</td></tr>`).join("")
+        || '<tr><td colspan="4" class="ipucu">Kayıtlı hata yok.</td></tr>';
+    } catch (e) { bildir(e.message); }
+  }
+  const EYLEM_OLAY = { hata: "Hata bildirildi", hata_gecti: "Hata giderildi", filament_yok: "Filament bitti", koptu: "Bağlantı koptu", dis_mudahale: "MAJÖR: yazıcıdan müdahale" };
+  let ayGecmisVeri = [];
+  async function ayGecmisYukle(id) {
+    const aralik = Number($("#ay-gecmis-aralik").value), adim = Number($("#ay-gecmis-adim").value);
+    const bas = aralik ? Math.floor(Date.now() / 1000) - aralik : "";
+    try {
+      const [t, d] = await Promise.all([api(`/api/yazicilar/${id}/telemetri?limit=2000&adim=${adim}&baslangic=${bas}`), api(`/api/yazicilar/${id}/degisimler?limit=500&baslangic=${bas}`)]);
+      ayGecmisVeri = t.ornekler;
+      const oz = t.ozet || {};
+      $("#ay-gecmis-ozet").textContent = `${t.ornekler.length} örnek gösteriliyor · dosyada ${oz.ornek || 0} örnek, ${oz.degisim || 0} değişim` + (oz.boyut ? ` · ${(oz.boyut / 1024 / 1024).toFixed(1)} MB` : "");
+      $("#ay-degisim-tablo tbody").innerHTML = d.degisimler.map(x => `<tr class="${x.alan === "hata_kodu" && x.yeni && x.yeni !== "0" ? "kritik" : ""}"><td class="zaman">${new Date(x.zaman * 1000).toLocaleString("tr-TR")}</td><td class="eylem">${kacis(ALAN_AD[x.alan] || x.alan)}</td><td>${kacis(degerAd(x.alan, x.eski))}</td><td>${kacis(degerAd(x.alan, x.yeni))}</td><td class="ipucu">${kacis(x.baglam || "")}</td></tr>`).join("")
+        || '<tr><td colspan="5" class="ipucu">Bu aralıkta değişiklik yok.</td></tr>';
+      const d1 = (v) => v == null ? "" : Number(v).toFixed(0);
+      $("#ay-telemetri-tablo tbody").innerHTML = t.ornekler.map(o => `<tr><td class="zaman">${new Date(o.zaman * 1000).toLocaleString("tr-TR")}</td><td>${kacis(DURUM_AD[o.durum] || o.durum || "")}</td><td title="${kacis(o.dosya || "")}">${kacis(o.dosya || "")}</td><td>${o.ilerleme == null ? "" : Math.round(o.ilerleme)}</td><td>${o.katman == null ? "" : o.katman + "/" + (o.toplam_katman || "?")}</td><td>${d1(o.nozul)}${o.nozul_hedef ? "/" + d1(o.nozul_hedef) : ""}</td><td>${d1(o.tabla)}${o.tabla_hedef ? "/" + d1(o.tabla_hedef) : ""}</td><td>${d1(o.kabin)}</td><td>${d1(o.fan)}</td><td>${d1(o.hiz_yuzde)}</td><td>${o.kalan_sn == null ? "" : sure(o.kalan_sn)}</td><td>${o.hata_kodu ? kacis(String(o.hata_kodu)) : ""}</td></tr>`).join("")
+        || '<tr><td colspan="12" class="ipucu">Bu aralıkta örnek yok.</td></tr>';
+    } catch (e) { bildir(e.message); }
+  }
+  ["#ay-gecmis-aralik", "#ay-gecmis-adim"].forEach(s => $(s).addEventListener("change", () => st.acikYazici && ayGecmisYukle(st.acikYazici)));
+  $("#ay-gecmis-yenile").addEventListener("click", () => st.acikYazici && ayGecmisYukle(st.acikYazici));
+  $("#ay-gecmis-csv").addEventListener("click", () => {
+    const y = st.yazicilar.get(st.acikYazici); if (!y || !ayGecmisVeri.length) { bildir("İndirilecek veri yok"); return; }
+    const kolon = ["zaman", "durum", "baglanti", "dosya", "ilerleme", "katman", "toplam_katman", "kalan_sn", "gecen_sn", "nozul", "nozul_hedef", "tabla", "tabla_hedef", "kabin", "kabin_hedef", "fan", "hiz_yuzde", "isik", "hata_kodu", "hata_anahtari"];
+    const satir = (o) => kolon.map(k => { let v = o[k]; if (k === "zaman") v = new Date(v * 1000).toISOString(); return v == null ? "" : `"${String(v).replace(/"/g, '""')}"`; }).join(";");
+    const csv = "\ufeff" + kolon.join(";") + "\n" + ayGecmisVeri.slice().reverse().map(satir).join("\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `${y.ad}_telemetri.csv`; a.click(); URL.revokeObjectURL(a.href);
+  });
+  $("#ay-dosya-btn").addEventListener("click", () => { yukleHedef = st.acikYazici; $("#dosya-secici").value = ""; $("#dosya-secici").click(); });
   const IK = (yol) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${yol}</svg>`;
   const IKON = {
     printer: IK('<path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="9" rx="2"/><path d="M6 15h12v6H6z"/><circle cx="17.5" cy="12.5" r=".8" fill="currentColor"/>'),
@@ -312,9 +380,12 @@
   function ayrintiDoldur(y) {
     const c = y.canli || {}, d = c.durum || "cevrimdisi", renk = `var(--d-${d})`;
     $("#ay-baslik").textContent = y.ad;
-    $("#ay-altbaslik").textContent = [y.ip, c.model || y.model, c.hostname || y.hostname, y.grup].filter(Boolean).join(" · ");
+    $("#ay-altbaslik").textContent = [y.ip, c.model_adi || c.model || y.model, y.grup].filter(Boolean).join(" · ");
     $("#ay-ikon").innerHTML = IKON.printer; $("#ay-ikon").style.setProperty("--renk", renk);
     const dr = $("#ay-durum"); dr.textContent = DURUM_AD[d] || d; dr.style.setProperty("--renk", renk);
+    $("#ay-alt-bilgi").textContent = [c.baglanti === "bagli" ? "Bağlı" : (c.baglanti === "baglaniyor" ? "Bağlanıyor" : "Bağlantı yok"), c.son_veri ? "son veri " + saat(c.son_veri) : "", c.dosya ? c.dosya : ""].filter(Boolean).join(" · ");
+    $("#ay-alt-sag").textContent = [c.model_adi || c.model || "", c.yazilim_surumu ? "yazılım " + c.yazilim_surumu : "", c.hostname || y.hostname || ""].filter(Boolean).join(" · ");
+    $("#ay-teknik").innerHTML = [["Model", c.model_adi || c.model || "–"], ["Model kodu", c.model || "–"], ["Yazılım", c.yazilim_surumu || "–"], ["Hostname", c.hostname || y.hostname || "–"], ["Ham durum", c.state_kodu != null ? `${c.state_kodu} / deviceState ${c.device_state}` : "–"], ["Yükleme dizini", y.gcode_dizini || "varsayılan"]].map(([k, v]) => `<div><b>${k}:</b> ${kacis(v)}</div>`).join("");
     const isitiyor = (v, h) => (h && v != null && v < h - 2) ? "var(--d-duraklatildi)" : (h ? "var(--d-hata)" : "var(--soluk)");
     const ilerleme = c.ilerleme != null ? Math.round(c.ilerleme) : null;
     $("#ay-kartlar").innerHTML = [
@@ -330,9 +401,8 @@
       bilgiKart(c.isik ? "bulb" : "bulb-off", "Işık", c.isik == null ? null : (c.isik ? "Açık" : "Kapalı"), { renk: c.isik ? "var(--d-duraklatildi)" : "var(--soluk)" }),
       bilgiKart("spool", "CFS", c.cfs_bagli ? "Bağlı" : "Yok", { renk: c.cfs_bagli ? "var(--d-basiyor)" : "var(--soluk)", pasifBos: false }),
       bilgiKart("wifi", "Bağlantı", c.baglanti === "bagli" ? "Bağlı" : (c.baglanti === "baglaniyor" ? "Bağlanıyor" : "Kopuk"), { alt: c.son_veri ? "son veri " + saat(c.son_veri) : (c.son_hata || ""), renk: c.baglanti === "bagli" ? "var(--d-basiyor)" : "var(--d-hata)", pasifBos: false }),
-      bilgiKart(c.hata_kodu ? "alert" : "check", "Hata", c.hata_kodu ? `${c.hata_kodu}` : "Yok", { alt: c.hata_kodu ? (c.hata_anahtari || "") : "sorun bildirilmedi", renk: c.hata_kodu ? "var(--d-hata)" : "var(--d-basiyor)", pasifBos: false }),
-      bilgiKart("hash", "Ham durum", c.state_kodu != null ? String(c.state_kodu) : null, { alt: c.device_state != null ? `deviceState ${c.device_state}` : "", renk: "var(--soluk)" }),
-      bilgiKart("cpu", "Model", c.model || y.model, { alt: c.model_surum || "", renk: "var(--soluk)" }),
+      bilgiKart(c.hata_kodu ? "alert" : "check", "Hata", c.hata_kodu ? ((st.ayHata && st.ayHata.bilinen) ? st.ayHata.metin : `Kod ${c.hata_anahtari || c.hata_kodu}`) : "Yok", { alt: c.hata_kodu ? (st.ayHata && st.ayHata.sinif ? st.ayHata.sinif + " · kod " + (c.hata_anahtari || c.hata_kodu) : "ayrıntı: Yazıcı Hataları") : "sorun bildirilmedi", renk: c.hata_kodu ? "var(--d-hata)" : "var(--d-basiyor)", pasifBos: false, genis: !!c.hata_kodu }),
+      bilgiKart("cpu", "Model", c.model_adi || c.model || y.model, { alt: c.yazilim_surumu ? "yazılım " + c.yazilim_surumu : (c.model || ""), renk: "var(--soluk)" }),
       bilgiKart("tag", "Grup", y.grup, { alt: y.notlar || "", renk: "var(--soluk)" }),
     ].join("");
     const ipucu = { basiyor: "Baskı sürüyor: Durdur ile duraklatabilir, İptal Et ile sonlandırabilirsiniz.",
@@ -346,7 +416,7 @@
     });
     const f = $("#ay-form");
     if (!f.dataset.id || Number(f.dataset.id) !== y.id) {
-      f.dataset.id = y.id; f.ad.value = y.ad; f.ip.value = y.ip; f.port.value = y.port;
+      f.dataset.id = y.id; f.ad.value = y.ad; f.ip.value = y.ip; f.port.value = y.port; f.http_port.value = y.http_port || 80;
       f.grup.value = y.grup || ""; f.notlar.value = y.notlar || ""; f.etkin.checked = !!y.etkin;
     }
   }
@@ -354,7 +424,7 @@
     e.preventDefault();
     const f = e.target, id = Number(f.dataset.id);
     try {
-      await put(`/api/yazicilar/${id}`, { ad: f.ad.value, ip: f.ip.value, port: Number(f.port.value) || 9999, grup: f.grup.value, notlar: f.notlar.value, etkin: f.etkin.checked });
+      await put(`/api/yazicilar/${id}`, { ad: f.ad.value, ip: f.ip.value, port: Number(f.port.value) || 9999, http_port: Number(f.http_port.value) || 80, grup: f.grup.value, notlar: f.notlar.value, etkin: f.etkin.checked });
       bildir("Kaydedildi");
     } catch (err) { bildir(err.message); }
   });
@@ -463,6 +533,7 @@
     else if (!a.token_gecerli) { td.textContent = `Kayıtlı belirteç (${a.token_maske}) geçersiz biçimde! BotFather'ın verdiği satırı yeniden yapıştırıp kaydedin.`; td.className = "ipucu olay-kritik"; }
     else { td.textContent = "Belirteç kayıtlı" + (a.bot_adi ? ` · bot @${a.bot_adi}` : "") + "."; td.className = "ipucu"; }
     f.sohbetler.value = a.sohbetler.join(", ");
+    f.yonetici_sohbetler.value = (a.yonetici_sohbetler || []).join(", ");
     f.etkin.checked = a.etkin;
     $("#tg-olaylar").innerHTML = a.secilebilir.map(o =>
       `<label><input type="checkbox" name="olay" value="${o.tur}" ${a.olaylar.includes(o.tur) ? "checked" : ""}> ${kacis(o.ad)}</label>`).join("");
@@ -478,7 +549,7 @@
   }
   function tgForm() {
     const f = $("#tg-form");
-    return { token: f.token.value.trim(), sohbetler: f.sohbetler.value, etkin: f.etkin.checked,
+    return { token: f.token.value.trim(), sohbetler: f.sohbetler.value, yonetici_sohbetler: f.yonetici_sohbetler.value, etkin: f.etkin.checked,
              olaylar: $$("#tg-olaylar input:checked").map(i => i.value) };
   }
   $("#tg-form").addEventListener("submit", async (e) => {
@@ -561,6 +632,7 @@
       f.reset(); bildir("Kullanıcı eklendi"); kullaniciTablo((await api("/api/kullanicilar")).kullanicilar);
     } catch (err) { bildir(err.message, 6000); }
   });
+  const EYLEM_AD_EK = {};
   const EYLEM_AD = { giris: "Giriş yaptı", giris_basarisiz: "Başarısız giriş", cikis: "Çıkış yaptı", kurulum: "İlk kurulum",
     parola_degistirdi: "Parolasını değiştirdi", kullanici_ekledi: "Kullanıcı ekledi", kullanici_guncelledi: "Kullanıcı güncelledi", kullanici_sildi: "Kullanıcı sildi",
     yazici_ekledi: "Yazıcı ekledi", yazici_guncelledi: "Yazıcı güncelledi", yazici_sildi: "Yazıcı sildi", tarama_baslatti: "Ağ taraması başlattı",
@@ -593,7 +665,7 @@
 
   // ---------- genel ----------
   function ac(id) { $("#" + id).hidden = false; }
-  function kapat(id) { $("#" + id).hidden = true; if (id === "ortu-ayrinti") { st.acikYazici = null; $("#ay-form").dataset.id = ""; } }
+  function kapat(id) { $("#" + id).hidden = true; if (id === "ortu-ayrinti") { st.acikYazici = null; st.ayHata = null; $("#ay-form").dataset.id = ""; ayMenuKapat(); } }
   $$("[data-kapat]").forEach(b => b.addEventListener("click", () => kapat(b.dataset.kapat)));
   $$(".ortu").forEach(o => o.addEventListener("click", (e) => { if (e.target === o) kapat(o.id); }));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") $$(".ortu").forEach(o => { if (!o.hidden) kapat(o.id); }); });

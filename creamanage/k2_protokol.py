@@ -200,6 +200,31 @@ def dosya_adi(yol: str) -> str:
     return (yol or "").replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
 
 
+MODEL_ADLARI = {"F008": "K2 Plus", "F012": "K2 Pro", "F021": "K2", "F022": "SPARKX i7",
+                "F001": "K1", "F002": "K1 Max", "F005": "K1C", "F011": "K1 SE", "F018": "Hi"}
+
+
+def model_adi(kod: str) -> str:
+    kod = (kod or "").strip()
+    return MODEL_ADLARI.get(kod, kod)
+
+
+def yazilim_surumu(model_version: str) -> str:
+    """'printer hw ver:;printer sw ver:;DWIN hw ver:CR0CN…;DWIN sw ver:1.1.6.4;' → '1.1.6.4'."""
+    mv = (model_version or "").strip()
+    if ";" not in mv and ":" not in mv:
+        return mv
+    parcalar = {}
+    for parca in mv.split(";"):
+        if ":" in parca:
+            k, v = parca.split(":", 1)
+            parcalar[k.strip().lower()] = v.strip()
+    for anahtar in ("printer sw ver", "dwin sw ver", "sw ver"):
+        if parcalar.get(anahtar):
+            return parcalar[anahtar]
+    return next((v for v in parcalar.values() if v), "")
+
+
 def ozet(ham: dict) -> dict:
     """Ham telemetriyi arayüzün kullandığı düz sözlüğe indirger."""
     kod, anahtar = hata_bilgisi(ham)
@@ -211,7 +236,9 @@ def ozet(ham: dict) -> dict:
         "state_kodu": _sayi(ham, "state"),
         "device_state": _sayi(ham, "deviceState"),
         "model": _metin(ham, "model"),
+        "model_adi": model_adi(_metin(ham, "model")),
         "model_surum": _metin(ham, "modelVersion"),
+        "yazilim_surumu": yazilim_surumu(_metin(ham, "modelVersion")),
         "hostname": _metin(ham, "hostname"),
         "dosya": dosya_adi(dosya_yolu),
         "dosya_yolu": dosya_yolu,

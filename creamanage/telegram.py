@@ -16,8 +16,8 @@ import time
 
 import aiohttp
 
-from .olaylar import (O_BASKI_BASLADI, O_BASKI_BITTI, O_DURAKLATILDI, O_FILAMENT_YOK,
-                      O_HATA, O_HATA_GECTI, O_KOPTU, O_BAGLANDI)
+from .olaylar import (O_BASKI_BASLADI, O_BASKI_BITTI, O_DIS_MUDAHALE, O_DURAKLATILDI, O_FILAMENT_YOK,
+                      O_HATA, O_HATA_GECTI, O_KOPTU, O_BAGLANDI, YALNIZ_YONETICI_SEVIYELER)
 
 log = logging.getLogger("creamanage.telegram")
 
@@ -39,7 +39,7 @@ SECILEBILIR_OLAYLAR = [
 ]
 VARSAYILAN_OLAYLAR = [O_HATA, O_BASKI_BITTI, O_FILAMENT_YOK]
 SIMGE = {
-    O_HATA: "🔴", O_BASKI_BITTI: "✅", O_FILAMENT_YOK: "🟠", O_KOPTU: "⚠️",
+    O_DIS_MUDAHALE: "🚨", O_HATA: "🔴", O_BASKI_BITTI: "✅", O_FILAMENT_YOK: "🟠", O_KOPTU: "⚠️",
     O_BAGLANDI: "🔌", O_HATA_GECTI: "🟢", O_DURAKLATILDI: "⏸", O_BASKI_BASLADI: "▶️",
 }
 
@@ -105,7 +105,8 @@ class TelegramBildirici:
     def __init__(self, vt, api_taban: str = API_TABAN) -> None:
         self.vt = vt
         self.api_taban = api_taban.rstrip("/")
-        self.ayar = {"etkin": False, "token": "", "sohbetler": [], "olaylar": list(VARSAYILAN_OLAYLAR)}
+        self.ayar = {"etkin": False, "token": "", "sohbetler": [], "olaylar": list(VARSAYILAN_OLAYLAR),
+                     "yonetici_sohbetler": []}     # majör olaylar (sistem dışı müdahale) yalnız buraya
         self.bot_adi = ""
         self._kuyruk: list[dict] = []
         self._gorev: asyncio.Task | None = None
@@ -119,8 +120,9 @@ class TelegramBildirici:
     def yukle(self) -> None:
         kayit = self.vt.ayar_oku(AYAR_ANAHTARI)
         if isinstance(kayit, dict):
-            self.ayar.update({k: kayit[k] for k in ("etkin", "token", "sohbetler", "olaylar") if k in kayit})
+            self.ayar.update({k: kayit[k] for k in ("etkin", "token", "sohbetler", "olaylar", "yonetici_sohbetler") if k in kayit})
             self.ayar["sohbetler"] = _sohbetleri_ayikla(self.ayar["sohbetler"])
+            self.ayar["yonetici_sohbetler"] = _sohbetleri_ayikla(self.ayar.get("yonetici_sohbetler", []))
 
     def kaydet(self, yeni: dict) -> dict:
         if "token" in yeni and str(yeni["token"]).strip():
@@ -130,6 +132,8 @@ class TelegramBildirici:
             self.ayar["token"] = token
         if "sohbetler" in yeni:
             self.ayar["sohbetler"] = _sohbetleri_ayikla(yeni["sohbetler"])
+        if "yonetici_sohbetler" in yeni:
+            self.ayar["yonetici_sohbetler"] = _sohbetleri_ayikla(yeni["yonetici_sohbetler"])
         if "olaylar" in yeni and isinstance(yeni["olaylar"], list):
             gecerli = {t for t, _ in SECILEBILIR_OLAYLAR}
             self.ayar["olaylar"] = [t for t in yeni["olaylar"] if t in gecerli]
@@ -147,6 +151,7 @@ class TelegramBildirici:
             "token_maske": (t[:6] + "…" + t[-4:]) if len(t) > 12 else ("•••" if t else ""),
             "bot_adi": self.bot_adi,
             "sohbetler": list(self.ayar["sohbetler"]),
+            "yonetici_sohbetler": list(self.ayar["yonetici_sohbetler"]),
             "olaylar": list(self.ayar["olaylar"]),
             "secilebilir": [{"tur": t, "ad": a} for t, a in SECILEBILIR_OLAYLAR],
             "son_gonderim": self.son_gonderim,
@@ -157,12 +162,18 @@ class TelegramBildirici:
 
     @property
     def hazir(self) -> bool:
-        return bool(self.ayar["etkin"] and self.ayar["token"] and self.ayar["sohbetler"])
+        return bool(self.ayar["etkin"] and self.ayar["token"] and (self.ayar["sohbetler"] or self.ayar["yonetici_sohbetler"]))
 
     # --- olay akışı ---
     async def olay_geldi(self, olay: dict) -> None:
-        """OlayMerkezi abonesi."""
-        if not self.hazir or olay.get("tur") not in self.ayar["olaylar"]:
+        """OlayMerkezi abonesi. Majör olaylar (sistem dışı müdahale) yalnız yönetici kanalına gider."""
+        if not self.hazir:
+            return
+        major = olay.get("seviye") in YALNIZ_YONETICI_SEVIYELER
+        if major:
+            if not self.ayar["yonetici_sohbetler"]:
+                return
+        elif olay.get("tur") not in self.ayar["olaylar"] or not self.ayar["sohbetler"]:
             return
         self._kuyruk.append(olay)
         if self._gorev is None or self._gorev.done():
@@ -174,7 +185,12 @@ class TelegramBildirici:
             olaylar, self._kuyruk = self._kuyruk, []
             if not olaylar:
                 return
-            await self.metin_gonder(mesaj_olustur(olaylar))
+            normal = [o for o in olaylar if o.get("seviye") not in YALNIZ_YONETICI_SEVIYELER]
+            major = [o for o in olaylar if o.get("seviye") in YALNIZ_YONETICI_SEVIYELER]
+            if normal and self.ayar["sohbetler"]:
+                await self.metin_gonder(mesaj_olustur(normal), self.ayar["sohbetler"])
+            if major and self.ayar["yonetici_sohbetler"]:
+                await self.metin_gonder("🚨 <b>MAJÖR — yalnız yöneticiler</b>\n" + mesaj_olustur(major), self.ayar["yonetici_sohbetler"])
 
     async def bekle(self) -> None:
         """Testler için: bekleyen toplu gönderim bitene dek bekler."""

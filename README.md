@@ -6,7 +6,7 @@ Creality **K2 Plus (Combo)** 3D yazıcı filosunu (hedef: 56 cihaz) yerel ağ ü
 Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sunduğu
 **WebSocket 9999** arayüzü kullanılır (root, Moonraker, bulut yok). Garanti korunur.
 
-## Sürüm 0.5.0 — ne yapar
+## Sürüm 0.6.0 — ne yapar
 
 - **Kullanıcı girişi ve roller:** herkes kullanıcı adı ve parola ile girer. Üç rol:
   **Sistem Yöneticisi** (her şey + kullanıcı yönetimi, işlem geçmişi, bildirim ayarları),
@@ -29,6 +29,22 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
   kaydırılan modül alanı, sabit alt çubukta durum sayaçları. Modüller: Yazıcılar (kartlar),
   Dosya Listesi (satırlar), Dosya Yöneticisi (yükle ve yazdır), Olaylar; sistem yöneticisine
   ek olarak Bildirimler ve Kullanıcılar.
+- **Telemetri kaydı (yazıcı başına SQLite):** her yazıcı için ayrı dosya
+  (`<veritabanı>_telemetri/yazici_<id>.sqlite`). Saniyede bir örnek alınır, yalnız değişen
+  saniyeler yazılır; durum, bağlantı, hata, dosya ve IP değişimleri ayrıca eski→yeni olarak
+  kaydedilir. Varsayılan saklama 30 gün (`--telemetri-gun`). Ayrıntı penceresinde Geçmiş
+  modülünden aralık/çözünürlük seçilir, CSV indirilir.
+- **Yazıcı ayrıntısı:** sabit başlık (ad, IP; modül menüsü ve Kapat), ortada kaydırılan
+  modül, alt bilgi çubuğu. Modüller: Durum Bilgisi, İşlemler (yazıcı yöneticisi), Yazıcı
+  Hataları, Geçmiş, Yazıcı Ayarları (yalnız sistem yöneticisi: IP/portlar/grup/silme).
+- **Hata kodları anlamlı metinle (Türkçe):** `creamanage/veri/hata_kodlari.json` tablosunda
+  Creality'nin K2 Plus hata kodu özeti (kontrolör, devre kartı, alet kiti, sistem, AI, CFS;
+  80 kod) Türkçe başlık ve çözümle bulunur. Yazıcının `err.key` alanı (asıl kod, ör. 2586 =
+  CY2586) tabloda aranır; `err.errcode` yalnız sınıftır (500 kritik, 208 uyarı…). Yeni kodlar
+  için `python3 araclar/hata_kodlari_al.py --url/--csv/--html` ile tablo genişletilir.
+- **Sistem dışı müdahale = MAJÖR olay:** baskı, CreaManage üzerinden komut verilmeden
+  (yazıcı ekranından) durdurulur ya da iptal edilirse `dis_mudahale` olayı üretilir; yalnız
+  sistem yöneticileri görür ve Telegram'da yalnız "yönetici kanalı" sohbetlerine gider.
 - **Gece / gündüz teması:** üst çubuktaki güneş/ay düğmesiyle; tercih kullanıcı hesabına
   kaydedilir (her cihazda aynı), seçilmemişse işletim sistemi teması izlenir.
 - **Yazıcı ayrıntısı:** ikonlu bilgi kartları (dosya, ilerleme, süreler, sıcaklıklar, fan,
@@ -114,7 +130,7 @@ Simülatör telemetri, kalp atışı ve `pause/stop/lightSw` komutlarını takli
 
 ```bash
 cd testler
-python3 -m unittest -v test_yukleme test_kullanicilar test_k2_protokol test_filo_uctan_uca test_telegram
+python3 -m unittest -v test_telemetri test_mudahale test_yukleme test_kullanicilar test_k2_protokol test_filo_uctan_uca test_telegram
 ```
 
 Telegram testleri sahte bir Telegram API sunucusuyla çalışır, internet gerekmez.
@@ -139,6 +155,8 @@ creamanage/
   kullanicilar.py  roller, parola hash'i, oturumlar, giriş kilidi
   web.py           aiohttp: kimlik/rol ara katmanı, statik arayüz, REST API, /ws yayını
   yukleme.py       HTTP dosya yükleme (/upload), /info model sorgusu, güvenli dosya adı
+  telemetri_kayit.py  yazıcı başına SQLite: 1 sn örnekleme, değişim günlüğü, saklama
+  hata_kodlari.py  Creality hata kodu tablosu (veri/hata_kodlari.json) → anlamlı metin
   telegram.py      Telegram bildirim kanalı (OlayMerkezi abonesi, toplu gönderim, 429 uyumu)
 web/               index.html, css/stil.css, js/uygulama.js (bağımlılıksız)
 araclar/sahte_yazici.py   K2 simülatörü
@@ -158,6 +176,9 @@ testler/           birim ve uçtan uca testler
 | `POST /api/yazicilar` | `{ad, ip, port?, grup?, notlar?}` |
 | `POST /api/yazicilar/toplu` | `{yazicilar:[{ip, ad, port, model, hostname, grup}]}` |
 | `GET/PUT/DELETE /api/yazicilar/{id}` | ayrıntı (+ham, +olaylar) / güncelle / sil |
+| `GET /api/yazicilar/{id}/telemetri?baslangic=&bitis=&adim=&limit=` | telemetri örnekleri (adim: seyreltme sn) |
+| `GET /api/yazicilar/{id}/degisimler`, `GET /api/yazicilar/{id}/hatalar` | değişim ve hata geçmişi |
+| `GET /api/hata_kodlari` | hata kodu tablosu |
 | `POST /api/yazicilar/{id}/dosya` | multipart `file` (+`baslat`=1/0): yükle ve yazdır (yazıcı yöneticisi) |
 | `POST /api/yazicilar/{id}/komut` | `{komut: duraklat\|surdur\|durdur\|isik\|nozul\|tabla\|fan, deger?}` |
 | `GET /api/aglar` | makinedeki alt ağlar |

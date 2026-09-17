@@ -17,11 +17,14 @@ from .filo import Filo
 from .kullanicilar import CEREZ_ADI, OTURUM_EN_FAZLA_SN, ROL_ADLARI, KullaniciYonetimi, gorunum as k_gorunum, yetkili_mi
 from .telegram import TelegramBildirici
 from . import yukleme as Y
+from . import hata_kodlari as HK
+from .olaylar import yonetici_mi_gorur
 from .surum import FIRMA, SURUM, URUN_ADI, URUN_KODU
 
 log = logging.getLogger("creamanage.web")
 FILO_ANAHTAR = web.AppKey("filo", Filo)
 WS_ISTEMCILER = web.AppKey("ws_istemciler", weakref.WeakSet)
+WS_ROLLER = web.AppKey("ws_roller", weakref.WeakKeyDictionary)
 WEB_DIZIN = Path(__file__).resolve().parent.parent / "web"
 
 
@@ -87,10 +90,14 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
     app = web.Application(middlewares=[kimlik_katmani], client_max_size=Y.EN_BUYUK_DOSYA)
     app[FILO_ANAHTAR] = filo
     app[WS_ISTEMCILER] = weakref.WeakSet()
+    app[WS_ROLLER] = weakref.WeakKeyDictionary()
 
     async def yayin(mesaj: dict) -> None:
         metin = json.dumps(mesaj, ensure_ascii=False)
+        yalniz_yonetici = mesaj.get("tur") == "olay" and not yonetici_mi_gorur(mesaj.get("olay") or {}, "gozetmen")
         for ws in list(app[WS_ISTEMCILER]):
+            if yalniz_yonetici and app[WS_ROLLER].get(ws) != "sistem_yoneticisi":
+                continue
             try:
                 await ws.send_str(metin)
             except Exception:  # noqa: BLE001
@@ -246,12 +253,19 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
     async def yazicilar(_):
         return _json({"yazicilar": filo.yazicilar_gorunum(), "sayilar": filo.ozet_sayilar()})
 
+    def _olay_suz(olaylar, istek):
+        rol = istek["kullanici"]["rol"]
+        return [o for o in olaylar if yonetici_mi_gorur(o, rol)]
+
     async def yazici(istek):
         yid = int(istek.match_info["id"])
         if yid not in filo.kayitlar:
             return _hata("yazıcı bulunamadı", 404)
-        return _json({"yazici": filo.yazici_gorunum(yid), "ham": filo.ham(yid),
-                      "olaylar": filo.vt.olaylar(50, yid)})
+        g = filo.yazici_gorunum(yid)
+        c = g.get("canli") or {}
+        return _json({"yazici": g, "ham": filo.ham(yid) if istek["kullanici"]["rol"] == "sistem_yoneticisi" else {},
+                      "olaylar": _olay_suz(filo.vt.olaylar(100, yid), istek),
+                      "hata": HK.acikla(c.get("hata_kodu"), c.get("hata_anahtari")) if c.get("hata_kodu") else None})
 
     async def yazici_ekle(istek):
         v = await _govde(istek)
@@ -330,7 +344,7 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
         if yid not in filo.kayitlar:
             return _hata("yazıcı bulunamadı", 404)
         try:
-            sonuc = await filo.komut(yid, ad, v.get("deger"))
+            sonuc = await filo.komut(yid, ad, v.get("deger"), istek["kullanici"]["kullanici_adi"])
         except ValueError as e:
             return _hata(str(e))
         dosya = (filo.baglantilar[yid].ozet().get("dosya") if yid in filo.baglantilar else "") or ""
@@ -338,6 +352,45 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
                  (f"dosya: {dosya}; " if dosya else "") + (f"değer: {v.get('deger')}; " if v.get("deger") is not None else "")
                  + ("gönderildi" if sonuc else "GÖNDERİLEMEDİ: yazıcı bağlı değil"))
         return _json({"gonderildi": sonuc})
+
+    def _zaman(istek, ad, varsayilan=None):
+        v = istek.query.get(ad)
+        try:
+            return float(v) if v not in (None, "") else varsayilan
+        except ValueError:
+            return varsayilan
+
+    async def telemetri_ornekler(istek):
+        yid = int(istek.match_info["id"])
+        if yid not in filo.kayitlar:
+            return _hata("yazıcı bulunamadı", 404)
+        if filo.telemetri is None:
+            return _json({"ornekler": [], "ozet": {}})
+        limit = min(int(istek.query.get("limit", "600")), 5000)
+        adim = _zaman(istek, "adim", 0.0)
+        bas = _zaman(istek, "baslangic"); bit = _zaman(istek, "bitis")
+        return _json({"ornekler": filo.telemetri.ornekler(yid, bas, bit, limit, adim or 0.0),
+                      "ozet": filo.telemetri.ozet(yid)})
+
+    async def telemetri_degisimler(istek):
+        yid = int(istek.match_info["id"])
+        if yid not in filo.kayitlar:
+            return _hata("yazıcı bulunamadı", 404)
+        if filo.telemetri is None:
+            return _json({"degisimler": []})
+        limit = min(int(istek.query.get("limit", "300")), 5000)
+        return _json({"degisimler": filo.telemetri.degisimler(yid, istek.query.get("alan") or None, _zaman(istek, "baslangic"), limit)})
+
+    async def telemetri_hatalar(istek):
+        yid = int(istek.match_info["id"])
+        if yid not in filo.kayitlar:
+            return _hata("yazıcı bulunamadı", 404)
+        hatalar = filo.telemetri.hatalar(yid) if filo.telemetri else []
+        for h in hatalar:
+            if h.get("basladi"):
+                h["aciklama"] = HK.acikla(h.get("yeni"), h.get("baglam"))
+        olaylar = [o for o in filo.vt.olaylar(300, yid) if o["tur"] in ("hata", "hata_gecti", "filament_yok", "koptu", "dis_mudahale")]
+        return _json({"hatalar": hatalar, "olaylar": _olay_suz(olaylar, istek)})
 
     async def dosya_yukle(istek):
         """multipart: file (zorunlu), baslat (1/0, varsayılan 1). Yükler ve baskıyı başlatır."""
@@ -416,7 +469,10 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
 
     async def olaylar(istek):
         limit = min(int(istek.query.get("limit", "100")), 1000)
-        return _json({"olaylar": filo.vt.olaylar(limit)})
+        return _json({"olaylar": _olay_suz(filo.vt.olaylar(limit), istek)})
+
+    async def hata_kodlari_oku(istek):
+        return _json({"bilgi": HK.bilgi(), "kodlar": HK.kodlar()})
 
     # --- Telegram bildirim ayarları ---
     def _tg() -> TelegramBildirici:
@@ -474,11 +530,12 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
     async def ws_ucu(istek):
         ws = web.WebSocketResponse(heartbeat=25)
         await ws.prepare(istek)
+        app[WS_ROLLER][ws] = istek["kullanici"]["rol"]
         app[WS_ISTEMCILER].add(ws)
         try:
             await ws.send_str(json.dumps({
                 "tur": "anlik", "kullanici": k_gorunum(istek["kullanici"]), "yazicilar": filo.yazicilar_gorunum(),
-                "sayilar": filo.ozet_sayilar(), "olaylar": filo.vt.olaylar(50),
+                "sayilar": filo.ozet_sayilar(), "olaylar": _olay_suz(filo.vt.olaylar(100), istek),
                 "tarama": filo.tarama_gorunum()}, ensure_ascii=False))
             async for msg in ws:
                 if msg.type in (WSMsgType.CLOSE, WSMsgType.ERROR):
@@ -511,11 +568,15 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
     app.router.add_delete(r"/api/yazicilar/{id:\d+}", yazici_sil)
     app.router.add_post(r"/api/yazicilar/{id:\d+}/komut", komut)
     app.router.add_post(r"/api/yazicilar/{id:\d+}/dosya", dosya_yukle)
+    app.router.add_get(r"/api/yazicilar/{id:\d+}/telemetri", telemetri_ornekler)
+    app.router.add_get(r"/api/yazicilar/{id:\d+}/degisimler", telemetri_degisimler)
+    app.router.add_get(r"/api/yazicilar/{id:\d+}/hatalar", telemetri_hatalar)
     app.router.add_get("/api/aglar", aglar)
     app.router.add_post("/api/tarama", tarama_baslat)
     app.router.add_get("/api/tarama", tarama_durum)
     app.router.add_post("/api/tarama/iptal", tarama_iptal)
     app.router.add_get("/api/olaylar", olaylar)
+    app.router.add_get("/api/hata_kodlari", hata_kodlari_oku)
     app.router.add_get("/api/ayarlar/telegram", telegram_oku)
     app.router.add_put("/api/ayarlar/telegram", telegram_yaz)
     app.router.add_post("/api/ayarlar/telegram/test", telegram_test)

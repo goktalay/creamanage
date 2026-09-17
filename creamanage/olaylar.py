@@ -25,13 +25,19 @@ O_HATA_GECTI = "hata_gecti"
 O_FILAMENT_YOK = "filament_yok"
 O_YAZICI_EKLENDI = "yazici_eklendi"
 O_YAZICI_SILINDI = "yazici_silindi"
+O_DIS_MUDAHALE = "dis_mudahale"          # yazıcıdan (sistem dışı) durdurma / iptal — MAJÖR
 O_DOSYA_YUKLENDI = "dosya_yuklendi"
 O_BASKI_BASLATILDI = "baski_baslatildi"
 
 SEVIYE = {
     O_KOPTU: "uyari", O_HATA: "kritik", O_FILAMENT_YOK: "uyari",
-    O_BASKI_BITTI: "basari",
+    O_BASKI_BITTI: "basari", O_DIS_MUDAHALE: "major",
 }
+YALNIZ_YONETICI_SEVIYELER = ("major",)      # yalnız sistem yöneticisi görür
+
+
+def yonetici_mi_gorur(olay: dict, rol: str) -> bool:
+    return olay.get("seviye") not in YALNIZ_YONETICI_SEVIYELER or rol == "sistem_yoneticisi"
 
 Abone = Callable[[dict], Awaitable[None] | None]
 
