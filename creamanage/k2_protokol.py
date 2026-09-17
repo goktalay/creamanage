@@ -184,9 +184,15 @@ def durum_turet(ham: dict) -> str:
     return D_BOSTA
 
 
+def dosya_adi(yol: str) -> str:
+    """'/mnt/UDISK/printer_data/gcodes/parca.gcode' → 'parca.gcode'."""
+    return (yol or "").replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+
+
 def ozet(ham: dict) -> dict:
     """Ham telemetriyi arayüzün kullandığı düz sözlüğe indirger."""
     kod, anahtar = hata_bilgisi(ham)
+    dosya_yolu = _metin(ham, "printFileName", "printName")
     kalan_sn = _sayi(ham, "printLeftTime", "printTimeLeft")
     gecen_sn = _sayi(ham, "printJobTime")
     return {
@@ -196,7 +202,8 @@ def ozet(ham: dict) -> dict:
         "model": _metin(ham, "model"),
         "model_surum": _metin(ham, "modelVersion"),
         "hostname": _metin(ham, "hostname"),
-        "dosya": _metin(ham, "printFileName", "printName"),
+        "dosya": dosya_adi(dosya_yolu),
+        "dosya_yolu": dosya_yolu,
         "ilerleme": _sayi(ham, "printProgress", "dProgress"),
         "kalan_sn": int(kalan_sn) if kalan_sn is not None else None,
         "gecen_sn": int(gecen_sn) if gecen_sn is not None else None,

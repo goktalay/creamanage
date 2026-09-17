@@ -62,6 +62,14 @@ class DurumTesti(unittest.TestCase):
         self.assertEqual(P.durum_turet({"err": {"errcode": 0}, "state": 0}), P.D_BOSTA)
         self.assertEqual(P.durum_turet({"deviceState": 7}), P.D_HAZIRLANIYOR)
 
+    def test_dosya_adi(self):
+        self.assertEqual(P.dosya_adi("/mnt/UDISK/printer_data/gcodes/parca_v2.gcode"), "parca_v2.gcode")
+        self.assertEqual(P.dosya_adi("parca.gcode"), "parca.gcode")
+        self.assertEqual(P.dosya_adi(""), "")
+        o = P.ozet({"printFileName": "/mnt/UDISK/kapak.gcode", "printProgress": 10, "state": 1})
+        self.assertEqual(o["dosya"], "kapak.gcode")
+        self.assertEqual(o["dosya_yolu"], "/mnt/UDISK/kapak.gcode")
+
     def test_ozet(self):
         o = P.ozet({"hostname": "K2Plus-01", "model": "K2 Plus", "nozzleTemp": "215.4", "targetNozzleTemp": 220,
                     "bedTemp0": 60, "targetBedTemp0": 60, "boxTemp": 35, "printFileName": "x.gcode",

@@ -104,7 +104,7 @@
     return `
       <div class="baslik"><span class="ad" title="${kacis(y.ad)}">${kacis(y.ad)}</span><span class="durum">${DURUM_AD[d] || d}</span></div>
       <div class="ip">${kacis(y.ip)}${y.grup ? " · " + kacis(y.grup) : ""}${c.model ? " · " + kacis(c.model) : ""}</div>
-      <div class="dosya" title="${kacis(c.dosya)}">${c.dosya ? kacis(c.dosya) : (d === "cevrimdisi" ? kacis(c.son_hata || "bağlantı bekleniyor") : "")}</div>
+      <div class="dosya" title="${kacis(c.dosya_yolu || c.dosya)}">${c.dosya ? kacis(c.dosya) : (d === "cevrimdisi" ? kacis(c.son_hata || "bağlantı bekleniyor") : "")}</div>
       <progress max="100" value="${ilerleme == null ? 0 : ilerleme}"></progress>
       <div class="satir-bilgi"><span>${ilerleme == null ? "" : "%" + ilerleme}</span><span>${c.katman != null && c.toplam_katman ? `katman ${c.katman}/${c.toplam_katman}` : ""}</span><span>${c.kalan_sn != null && d === "basiyor" ? "kalan " + sure(c.kalan_sn) : ""}</span></div>
       <div class="sicaklik"><span>Nozul <b>${derece(c.nozul, c.nozul_hedef)}</b></span><span>Tabla <b>${derece(c.tabla, c.tabla_hedef)}</b></span><span>Kabin <b>${derece(c.kabin, c.kabin_hedef)}</b></span>${c.filament_yok ? '<span class="olay-kritik">Filament yok</span>' : ""}</div>`;
@@ -161,11 +161,11 @@
   function ayrintiDoldur(y) {
     const c = y.canli || {};
     $("#ay-baslik").textContent = `${y.ad} — ${y.ip}`;
-    const alan = (k, v) => `<div><span>${k}</span>${v == null || v === "" ? "–" : kacis(v)}</div>`;
+    const alan = (k, v, ipucu) => `<div title="${kacis(ipucu || "")}"><span>${k}</span>${v == null || v === "" ? "–" : kacis(v)}</div>`;
     $("#ay-alanlar").innerHTML = [
       alan("Durum", DURUM_AD[c.durum] || c.durum), alan("Bağlantı", c.baglanti),
       alan("Model", c.model || y.model), alan("Hostname", c.hostname || y.hostname),
-      alan("Dosya", c.dosya), alan("İlerleme", c.ilerleme != null ? "%" + Math.round(c.ilerleme) : null),
+      alan("Dosya", c.dosya, c.dosya_yolu), alan("İlerleme", c.ilerleme != null ? "%" + Math.round(c.ilerleme) : null),
       alan("Katman", c.katman != null ? `${c.katman} / ${c.toplam_katman || "?"}` : null), alan("Kalan süre", c.kalan_sn != null ? sure(c.kalan_sn) : null),
       alan("Geçen süre", c.gecen_sn != null ? sure(c.gecen_sn) : null), alan("Hız", c.hiz_yuzde != null ? "%" + c.hiz_yuzde : null),
       alan("Nozul", derece(c.nozul, c.nozul_hedef)), alan("Tabla", derece(c.tabla, c.tabla_hedef)),
