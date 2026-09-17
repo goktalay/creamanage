@@ -20,8 +20,23 @@ from creamanage.veritabani import Veritabani  # noqa: E402
 from creamanage.web import uygulama_olustur  # noqa: E402
 
 
+def _windows_gurultusunu_sustur(loop: asyncio.AbstractEventLoop) -> None:
+    """Windows Proactor: tarayıcı bağlantıyı aniden kapatınca zararsız ConnectionResetError loglanır."""
+    varsayilan = loop.get_exception_handler()
+
+    def ele(loop_, baglam):
+        istisna = baglam.get("exception")
+        if isinstance(istisna, ConnectionResetError) and "_call_connection_lost" in str(baglam.get("handle", "")):
+            return
+        (varsayilan or loop_.default_exception_handler)(baglam)
+
+    loop.set_exception_handler(ele)
+
+
 async def calistir(argv: list[str] | None = None) -> None:
     ayar = ayarlari_oku(argv)
+    if sys.platform == "win32":
+        _windows_gurultusunu_sustur(asyncio.get_running_loop())
     logging.basicConfig(level=getattr(logging, ayar.log_seviye, logging.INFO),
                         format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     log = logging.getLogger("creamanage")

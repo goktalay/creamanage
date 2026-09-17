@@ -289,7 +289,7 @@
     const f = $("#tg-form"), a = tgAyar;
     f.token.value = "";
     f.token.placeholder = a.token_var ? `kayıtlı: ${a.token_maske} (değiştirmek için yenisini yazın)` : "123456789:AA…";
-    $("#tg-token-durum").textContent = a.token_var ? "Belirteç kayıtlı." : "Belirteç girilmemiş.";
+    $("#tg-token-durum").textContent = a.token_var ? ("Belirteç kayıtlı" + (a.bot_adi ? ` · bot @${a.bot_adi}` : "") + ".") : "Belirteç girilmemiş.";
     f.sohbetler.value = a.sohbetler.join(", ");
     f.etkin.checked = a.etkin;
     $("#tg-olaylar").innerHTML = a.secilebilir.map(o =>
@@ -311,8 +311,11 @@
   }
   $("#tg-form").addEventListener("submit", async (e) => {
     e.preventDefault();
-    try { tgAyar = (await put("/api/ayarlar/telegram", tgForm())).telegram; tgDoldur(); bildir("Bildirim ayarları kaydedildi"); }
-    catch (err) { bildir(err.message); }
+    try {
+      const r = await put("/api/ayarlar/telegram", tgForm());
+      tgAyar = r.telegram; tgDoldur();
+      bildir(r.uyari ? r.uyari : "Bildirim ayarları kaydedildi" + (tgAyar.bot_adi ? ` · bot @${tgAyar.bot_adi} doğrulandı` : ""), r.uyari ? 8000 : 4000);
+    } catch (err) { bildir(err.message, 8000); }
   });
   $("#tg-test").addEventListener("click", async () => {
     const v = tgForm(), b = $("#tg-test"); b.disabled = true;

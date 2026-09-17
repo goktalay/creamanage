@@ -197,7 +197,19 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> w
 
     async def telegram_yaz(istek):
         v = await _govde(istek)
-        return _json({"telegram": _tg().kaydet(v)})
+        tg = _tg()
+        try:
+            gorunum = tg.kaydet(v)
+        except ValueError as e:
+            return _hata(str(e))
+        uyari = ""
+        if tg.ayar["token"]:
+            try:
+                bot = await tg.bot_bilgisi()            # kaydedilen belirteci hemen doğrula
+                gorunum = tg.gorunum()
+            except Exception as e:  # noqa: BLE001
+                uyari = f"Ayar kaydedildi ama Telegram doğrulaması başarısız: {e}"
+        return _json({"telegram": gorunum, "uyari": uyari})
 
     async def telegram_test(istek):
         v = await _govde(istek)

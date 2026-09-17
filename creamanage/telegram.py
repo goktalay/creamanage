@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import html
 import logging
+import re
 import time
 
 import aiohttp
@@ -72,6 +73,21 @@ def mesaj_olustur(olaylar: list[dict]) -> str:
     return f"<b>CreaManage · {len(olaylar)} olay</b>\n" + "\n".join(satirlar)
 
 
+TOKEN_KALIBI = re.compile(r"^\d{6,12}:[A-Za-z0-9_-]{30,50}$")
+
+
+def token_temizle(ham) -> str:
+    """Yapıştırma artıklarını ayıklar: boşluk, 'bot' öneki, tırnak, URL parçası."""
+    t = str(ham or "").strip().strip("'\"")
+    t = re.sub(r"\s+", "", t)
+    m = re.search(r"(\d{6,12}:[A-Za-z0-9_-]{30,50})", t)
+    return m.group(1) if m else t
+
+
+def token_gecerli_mi(token: str) -> bool:
+    return bool(TOKEN_KALIBI.match(token or ""))
+
+
 def _sohbetleri_ayikla(metin) -> list[str]:
     if isinstance(metin, list):
         parcalar = [str(p) for p in metin]
@@ -90,6 +106,7 @@ class TelegramBildirici:
         self.vt = vt
         self.api_taban = api_taban.rstrip("/")
         self.ayar = {"etkin": False, "token": "", "sohbetler": [], "olaylar": list(VARSAYILAN_OLAYLAR)}
+        self.bot_adi = ""
         self._kuyruk: list[dict] = []
         self._gorev: asyncio.Task | None = None
         self._kilit = asyncio.Lock()
@@ -107,7 +124,10 @@ class TelegramBildirici:
 
     def kaydet(self, yeni: dict) -> dict:
         if "token" in yeni and str(yeni["token"]).strip():
-            self.ayar["token"] = str(yeni["token"]).strip()      # boş gelirse mevcut korunur
+            token = token_temizle(yeni["token"])                 # boş gelirse mevcut korunur
+            if not token_gecerli_mi(token):
+                raise ValueError("belirteç biçimi hatalı; BotFather'ın verdiği '123456789:AA…' satırını yapıştırın")
+            self.ayar["token"] = token
         if "sohbetler" in yeni:
             self.ayar["sohbetler"] = _sohbetleri_ayikla(yeni["sohbetler"])
         if "olaylar" in yeni and isinstance(yeni["olaylar"], list):
@@ -124,6 +144,7 @@ class TelegramBildirici:
             "etkin": self.ayar["etkin"],
             "token_var": bool(t),
             "token_maske": (t[:6] + "…" + t[-4:]) if len(t) > 12 else ("•••" if t else ""),
+            "bot_adi": self.bot_adi,
             "sohbetler": list(self.ayar["sohbetler"]),
             "olaylar": list(self.ayar["olaylar"]),
             "secilebilir": [{"tur": t, "ad": a} for t, a in SECILEBILIR_OLAYLAR],
@@ -161,9 +182,11 @@ class TelegramBildirici:
 
     # --- Telegram API ---
     async def _api(self, yontem: str, veri: dict | None = None, token: str | None = None) -> dict:
-        token = token or self.ayar["token"]
+        token = token_temizle(token) if token else self.ayar["token"]
         if not token:
             raise RuntimeError("bot belirteci girilmemiş")
+        if not token_gecerli_mi(token):
+            raise RuntimeError("belirteç biçimi hatalı ('123456789:AA…' beklenir)")
         url = f"{self.api_taban}/bot{token}/{yontem}"
         zaman = aiohttp.ClientTimeout(total=15)
         async with aiohttp.ClientSession(timeout=zaman) as oturum:
@@ -178,7 +201,12 @@ class TelegramBildirici:
                         await asyncio.sleep(min(bekle, 30))
                         continue
                     if not govde.get("ok"):
-                        raise RuntimeError(govde.get("description") or f"HTTP {yanit.status}")
+                        aciklama = govde.get("description") or f"HTTP {yanit.status}"
+                        if yanit.status == 404:
+                            aciklama += " (belirteç biçimi hatalı olabilir)"
+                        elif yanit.status == 401:
+                            aciklama += " (belirteç geçersiz ya da iptal edilmiş)"
+                        raise RuntimeError(aciklama)
                     return govde.get("result", {})
         raise RuntimeError("Telegram hız sınırı: 3 denemede gönderilemedi")
 
@@ -218,4 +246,7 @@ class TelegramBildirici:
 
     async def bot_bilgisi(self, token: str | None = None) -> dict:
         b = await self._api("getMe", {}, token)
-        return {"kullanici_adi": b.get("username", ""), "ad": b.get("first_name", "")}
+        bilgi = {"kullanici_adi": b.get("username", ""), "ad": b.get("first_name", "")}
+        if not token or token_temizle(token) == self.ayar["token"]:
+            self.bot_adi = bilgi["kullanici_adi"]
+        return bilgi
