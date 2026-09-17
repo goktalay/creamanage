@@ -77,7 +77,33 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
   kişi ya da gruplara mesaj. Aynı anda oluşan olaylar tek mesajda toplanır.
 - **Kalıcı kayıt:** `creamanage.sqlite` (yazıcılar + olaylar + ayarlar). Depoya girmez.
 
-## Kurulum ve çalıştırma
+## Ubuntu'da servis olarak kurulum (önerilen)
+
+```bash
+git clone https://github.com/goktalay/creamanage.git
+cd creamanage
+sudo bash kurulum/ubuntu_kur.sh
+```
+
+Betik `creamanage` sistem kullanıcısını açar, kodu `/opt/creamanage` altına kurar (sanal ortam
+ile), veriyi `/var/lib/creamanage` (SQLite, telemetri, hata kodu tablosu) altında tutar, ayarları
+`/etc/creamanage/creamanage.env` dosyasına yazar ve `creamanage` systemd servisini açılışta
+başlayacak şekilde etkinleştirir. Yeniden çalıştırmak güvenlidir.
+
+| İşlem | Komut |
+|---|---|
+| Durum / günlük | `systemctl status creamanage` · `journalctl -u creamanage -f` |
+| Yeniden başlat | `sudo systemctl restart creamanage` |
+| Güncelle | `sudo bash /opt/creamanage/kurulum/guncelle.sh` |
+| Port / ayar değiştir | `/etc/creamanage/creamanage.env` düzenle, sonra restart |
+| Parola sıfırla | `sudo -u creamanage /opt/creamanage/venv/bin/python /opt/creamanage/araclar/kullanici.py --veritabani /var/lib/creamanage/creamanage.sqlite parola mkaderoglu` |
+| Yedek | `/var/lib/creamanage` dizinini kopyalayın (servis çalışırken de alınabilir, WAL modu) |
+
+Güvenlik duvarı: `sudo ufw allow 8090/tcp`. Ağ dışından erişim için önüne HTTPS ters vekil
+(nginx/caddy) koyun; kamera modülünün tarayıcı WebRTC yolu yalnız HTTP sayfada çalışır, HTTPS
+kullanılıyorsa sunucu taraflı kamera URL'si (go2rtc) tanımlayın.
+
+## Elle çalıştırma (geliştirme)
 
 Gereksinim: Python ≥ 3.11 ve `aiohttp` (tek bağımlılık). Windows ve Linux'ta çalışır.
 
@@ -103,7 +129,7 @@ kullanılmazsa düşer), tarayıcıya yalnız HttpOnly çerez verilir. 5 başar�
 60 sn kilit. Ağ dışından erişim açılacaksa HTTPS (ters vekil) önerilir.
 
 Ortam değişkenleri: `CREAMANAGE_HOST`, `CREAMANAGE_PORT`, `CREAMANAGE_VERITABANI`,
-`CREAMANAGE_LOG`. Komut satırı: `--host`, `--port`, `--veritabani`, `--log`.
+`CREAMANAGE_TELEMETRI`, `CREAMANAGE_TELEMETRI_GUN`, `CREAMANAGE_HATA_KODLARI`, `CREAMANAGE_LOG`. Komut satırı: `--host`, `--port`, `--veritabani`, `--log`.
 
 Sunucu, yazıcılarla **aynı yerel ağda** (ya da 9999 portuna yönlendirilmiş bir ağda)
 olmalıdır. Tarama için alt ağ en fazla /20 (4096 adres) olabilir.

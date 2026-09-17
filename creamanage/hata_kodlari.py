@@ -10,11 +10,23 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import shutil
 import time
 from pathlib import Path
 
 log = logging.getLogger("creamanage.hata_kodlari")
-DOSYA = Path(__file__).resolve().parent / "veri" / "hata_kodlari.json"
+PAKET_DOSYA = Path(__file__).resolve().parent / "veri" / "hata_kodlari.json"
+# Servis kurulumunda tablo veri dizininde tutulur (CREAMANAGE_HATA_KODLARI); ilk çalıştırmada
+# paketle gelen tablo oraya kopyalanır, böylece kod güncellemeleri yönetici düzenlemelerini ezmez.
+DOSYA = Path(os.environ.get("CREAMANAGE_HATA_KODLARI") or PAKET_DOSYA)
+if DOSYA != PAKET_DOSYA and not DOSYA.exists():
+    try:
+        DOSYA.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(PAKET_DOSYA, DOSYA)
+    except OSError as e:  # pragma: no cover
+        log.warning("hata kodu tablosu veri dizinine kopyalanamadı (%s); paket dosyası kullanılacak", e)
+        DOSYA = PAKET_DOSYA
 CREALITY_SAYFA = "https://store.creality.com/blogs/all/creality-k2-plus-error-code-troubleshooting"
 
 # errcode sınıfları (topluluk gözlemi; kesin tablo key alanındadır)

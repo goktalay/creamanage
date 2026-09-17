@@ -1,0 +1,33 @@
+[Unit]
+Description=CreaManage — Creality yazıcı filo merkezi (Gökkubbe Teknoloji A.Ş.)
+Documentation=https://github.com/goktalay/creamanage
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=creamanage
+Group=creamanage
+WorkingDirectory=/opt/creamanage
+EnvironmentFile=/etc/creamanage/creamanage.env
+ExecStart=/opt/creamanage/venv/bin/python /opt/creamanage/main.py
+Restart=always
+RestartSec=3
+# Günlükler journald'ye gider: journalctl -u creamanage -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=creamanage
+
+# Sertleştirme: yalnız veri dizinine yazabilir
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/creamanage
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
