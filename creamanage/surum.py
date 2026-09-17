@@ -1,6 +1,6 @@
 """Tek sürüm kaynağı."""
 
-SURUM = "0.2.0"
+SURUM = "0.3.0"
 URUN_KODU = "CREAMANAGE"
 URUN_ADI = "CreaManage"
 FIRMA = "Gökkubbe Teknoloji Anonim Şirketi"

@@ -14,6 +14,7 @@ from aiohttp import web  # noqa: E402
 
 from creamanage.ayarlar import ayarlari_oku  # noqa: E402
 from creamanage.filo import Filo  # noqa: E402
+from creamanage.kullanicilar import KullaniciYonetimi  # noqa: E402
 from creamanage.surum import FIRMA, SURUM, URUN_ADI  # noqa: E402
 from creamanage.telegram import TelegramBildirici  # noqa: E402
 from creamanage.veritabani import Veritabani  # noqa: E402
@@ -45,12 +46,15 @@ async def calistir(argv: list[str] | None = None) -> None:
     telegram = TelegramBildirici(vt, api_taban=os.environ.get("CREAMANAGE_TELEGRAM_API") or "https://api.telegram.org")
     filo.olaylar.abone_ol(telegram.olay_geldi)
     await filo.baslat()
-    app = uygulama_olustur(filo, telegram)
+    kullanicilar = KullaniciYonetimi(vt)
+    app = uygulama_olustur(filo, telegram, kullanicilar)
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     site = web.TCPSite(runner, ayar.host, ayar.port)
     await site.start()
     log.info("%s %s — %s — http://%s:%d/", URUN_ADI, SURUM, FIRMA, ayar.host, ayar.port)
+    if not kullanicilar.kullanici_var_mi():
+        log.warning("Henüz kullanıcı yok: tarayıcıda /giris adresi ilk sistem yöneticisini oluşturmanızı isteyecek.")
     try:
         await asyncio.Event().wait()
     finally:

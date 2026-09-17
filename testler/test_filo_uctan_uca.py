@@ -72,6 +72,10 @@ class FiloVeApiTesti(unittest.IsolatedAsyncioTestCase):
         self.app = uygulama_olustur(self.filo)
         self.client = TestClient(TestServer(self.app))
         await self.client.start_server()
+        from creamanage.kullanicilar import KullaniciYonetimi
+        KullaniciYonetimi(self.vt).ekle("admin", "Test", "sistem_yoneticisi", "testparola123")
+        r = await self.client.post("/api/giris", json={"kullanici_adi": "admin", "parola": "testparola123"})
+        assert r.status == 200, await r.text()
 
     async def asyncTearDown(self):
         await self.client.close()   # on_shutdown → filo.durdur()

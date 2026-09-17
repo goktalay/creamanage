@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CreaManage · Giriş</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f5fbf'/%3E%3Ctext x='16' y='21' font-size='14' font-family='sans-serif' font-weight='700' fill='%23fff' text-anchor='middle'%3ECM%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/css/stil.css">
+</head>
+<body class="giris-sayfa">
+<main class="giris-kutu">
+  <div class="marka">
+    <span class="logo">CM</span>
+    <div><h1>CreaManage</h1><small>Yazıcı Filo Merkezi · Gökkubbe Teknoloji A.Ş.</small></div>
+  </div>
+
+  <form class="form" id="giris-form" hidden>
+    <h2>Giriş</h2>
+    <label>Kullanıcı adı <input name="kullanici_adi" autocomplete="username" autofocus required></label>
+    <label>Parola <input name="parola" type="password" autocomplete="current-password" required></label>
+    <button class="btn btn-birincil" type="submit">Giriş Yap</button>
+    <p class="ipucu hata" id="giris-hata"></p>
+  </form>
+
+  <form class="form" id="kurulum-form" hidden>
+    <h2>İlk kurulum</h2>
+    <p class="ipucu">Sistemde henüz kullanıcı yok. İlk <b>Sistem Yöneticisi</b> hesabını oluşturun; diğer kullanıcıları sonra bu hesapla ekleyeceksiniz.</p>
+    <label>Kullanıcı adı <input name="kullanici_adi" autocomplete="username" required pattern="[a-zA-Z0-9._\-]{3,32}" placeholder="örn. mkaderoglu"></label>
+    <label>Personel adı <input name="ad" autocomplete="name" placeholder="Ad Soyad"></label>
+    <label>Parola <input name="parola" type="password" autocomplete="new-password" required minlength="8"></label>
+    <label>Parola (tekrar) <input name="parola2" type="password" autocomplete="new-password" required minlength="8"></label>
+    <button class="btn btn-birincil" type="submit">Hesabı Oluştur ve Giriş Yap</button>
+    <p class="ipucu hata" id="kurulum-hata"></p>
+  </form>
+</main>
+<script>
+(function () {
+  const $ = (s) => document.querySelector(s);
+  async function api(yol, govde) {
+    const r = await fetch(yol, { method: govde ? "POST" : "GET", headers: { "Content-Type": "application/json" }, body: govde ? JSON.stringify(govde) : undefined });
+    let v = {}; try { v = await r.json(); } catch (e) { /* boş */ }
+    if (!r.ok) throw new Error(v.hata || (r.status + " " + r.statusText));
+    return v;
+  }
+  api("/api/kurulum").then(v => { (v.kurulum_gerekli ? $("#kurulum-form") : $("#giris-form")).hidden = false; })
+    .catch(e => { $("#giris-form").hidden = false; $("#giris-hata").textContent = e.message; });
+  $("#giris-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); const f = e.target; $("#giris-hata").textContent = "";
+    try { await api("/api/giris", { kullanici_adi: f.kullanici_adi.value.trim(), parola: f.parola.value }); location.href = "/"; }
+    catch (err) { $("#giris-hata").textContent = err.message; f.parola.value = ""; f.parola.focus(); }
+  });
+  $("#kurulum-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); const f = e.target; $("#kurulum-hata").textContent = "";
+    if (f.parola.value !== f.parola2.value) { $("#kurulum-hata").textContent = "Parolalar eşleşmiyor."; return; }
+    try { await api("/api/kurulum", { kullanici_adi: f.kullanici_adi.value.trim(), ad: f.ad.value.trim(), parola: f.parola.value }); location.href = "/"; }
+    catch (err) { $("#kurulum-hata").textContent = err.message; }
+  });
+})();
+</script>
+</body>
+</html>

@@ -11,7 +11,7 @@
   const $ = (s, k) => (k || document).querySelector(s);
   const $$ = (s, k) => Array.from((k || document).querySelectorAll(s));
 
-  const st = { yazicilar: new Map(), olaylar: [], tarama: null, acikYazici: null, ws: null, gorunum: "kart" };
+  const st = { yazicilar: new Map(), olaylar: [], tarama: null, acikYazici: null, ws: null, gorunum: "kart", ben: null };
   try { st.gorunum = localStorage.getItem("creamanage.gorunum") === "sade" ? "sade" : "kart"; } catch (e) { /* özel pencere */ }
 
   // ---------- yardımcılar ----------
@@ -41,8 +41,15 @@
     const r = await fetch(yol, Object.assign({ headers: { "Content-Type": "application/json" } }, secenek || {}));
     let veri = {};
     try { veri = await r.json(); } catch (e) { /* boş gövde */ }
+    if (r.status === 401) { location.href = "/giris"; throw new Error("giriş gerekli"); }
     if (!r.ok) throw new Error(veri.hata || (r.status + " " + r.statusText));
     return veri;
+  }
+  const ROL_SIRA = { gozetmen: 1, yazici_yoneticisi: 2, sistem_yoneticisi: 3 };
+  const yetkili = (rol) => st.ben && ROL_SIRA[st.ben.rol] >= ROL_SIRA[rol];
+  function rolUygula() {
+    $$("[data-rol]").forEach(el => el.classList.toggle("yetkisiz", !yetkili(el.dataset.rol)));
+    if (st.ben) { $("#ben-ad").textContent = st.ben.ad || st.ben.kullanici_adi; $("#ben-rol").textContent = st.ben.rol_adi; }
   }
   const post = (yol, govde) => api(yol, { method: "POST", body: JSON.stringify(govde || {}) });
   const put = (yol, govde) => api(yol, { method: "PUT", body: JSON.stringify(govde || {}) });
@@ -54,11 +61,12 @@
     const ws = new WebSocket(`${proto}://${location.host}/ws`);
     st.ws = ws;
     ws.onopen = () => rozet(true);
-    ws.onclose = () => { rozet(false); setTimeout(wsBaglan, 2000); };
+    ws.onclose = () => { rozet(false); setTimeout(() => api("/api/ben").then(wsBaglan).catch(() => {}), 2000); };
     ws.onerror = () => ws.close();
     ws.onmessage = (e) => {
       let m; try { m = JSON.parse(e.data); } catch (err) { return; }
       if (m.tur === "anlik") {
+        if (m.kullanici) { st.ben = m.kullanici; rolUygula(); }
         st.yazicilar = new Map(m.yazicilar.map(y => [y.id, y]));
         st.olaylar = m.olaylar || [];
         st.tarama = m.tarama;
@@ -183,7 +191,6 @@
     ac("ortu-ayrinti");
     try {
       const v = await api(`/api/yazicilar/${id}`);
-      $("#ay-ham").textContent = JSON.stringify(v.ham, null, 1);
       $("#ay-olaylar").innerHTML = v.olaylar.map(o => `<li class="olay-${o.seviye}"><time>${saat(o.zaman)}</time>${kacis(o.mesaj)}</li>`).join("") || "<li class='ipucu'>Olay yok.</li>";
     } catch (e) { bildir(e.message); }
   }
@@ -203,6 +210,15 @@
       alan("Ham state", c.state_kodu), alan("Hata", c.hata_kodu ? `${c.hata_kodu} ${c.hata_anahtari || ""}` : "Yok"),
       alan("Son veri", c.son_veri ? saat(c.son_veri) : null), alan("Son hata", c.son_hata),
     ].join("");
+    const ipucu = { basiyor: "Baskı sürüyor: Durdur ile duraklatabilir, İptal Et ile sonlandırabilirsiniz.",
+      duraklatildi: "Baskı duraklatıldı: Başlat ile sürdürün ya da İptal Et ile sonlandırın.",
+      cevrimdisi: "Yazıcı çevrimdışı; komut gönderilemez.", bosta: "Yazıcı boşta; yeni baskı yazıcıdan ya da Creality Print'ten başlatılır.",
+      tamamlandi: "Baskı tamamlandı.", hata: "Yazıcı hata bildiriyor; yazıcı ekranını kontrol edin.", hazirlaniyor: "Yazıcı hazırlanıyor (eksen sıfırlama)." };
+    $("#ay-komut-ipucu").textContent = ipucu[c.durum] || "";
+    $$("#ortu-ayrinti [data-komut]").forEach(b => {
+      const k = b.dataset.komut, d = c.durum;
+      b.disabled = d === "cevrimdisi" || (k === "duraklat" && d !== "basiyor") || (k === "surdur" && d !== "duraklatildi") || (k === "durdur" && !["basiyor", "duraklatildi", "hazirlaniyor"].includes(d));
+    });
     const f = $("#ay-form");
     if (!f.dataset.id || Number(f.dataset.id) !== y.id) {
       f.dataset.id = y.id; f.ad.value = y.ad; f.ip.value = y.ip; f.port.value = y.port;
@@ -224,7 +240,7 @@
   });
   $$("#ortu-ayrinti [data-komut]").forEach(b => b.addEventListener("click", async () => {
     const id = st.acikYazici, komut = b.dataset.komut;
-    if (komut === "durdur" && !confirm("Baskı durdurulsun mu? Bu işlem geri alınamaz.")) return;
+    if (komut === "durdur" && !confirm("Baskı iptal edilsin mi? Bu işlem geri alınamaz.")) return;
     try {
       const v = await post(`/api/yazicilar/${id}/komut`, { komut, deger: b.dataset.deger != null ? Number(b.dataset.deger) : null });
       bildir(v.gonderildi ? "Komut gönderildi" : "Gönderilemedi: yazıcı bağlı değil");
@@ -376,6 +392,83 @@
   });
   $("#btn-bildirim").addEventListener("click", bildirimAc);
 
+  // ---------- kullanıcılar ----------
+  let roller = {};
+  async function kullanicilarAc() {
+    ac("ortu-kullanicilar");
+    try { const v = await api("/api/kullanicilar"); roller = v.roller; kullaniciTablo(v.kullanicilar); }
+    catch (e) { bildir(e.message); }
+  }
+  function kullaniciTablo(liste) {
+    $("#kullanici-tablo tbody").innerHTML = liste.map(k => {
+      const ben = st.ben && k.id === st.ben.id;
+      const rolSec = Object.entries(roller).map(([r, a]) => `<option value="${r}" ${k.rol === r ? "selected" : ""}>${kacis(a)}</option>`).join("");
+      return `<tr data-id="${k.id}">
+        <td>${kacis(k.kullanici_adi)}${ben ? ' <small class="ipucu">(siz)</small>' : ""}</td>
+        <td><input type="text" class="ad" value="${kacis(k.ad)}"></td>
+        <td><select class="rol" ${ben ? "disabled" : ""}>${rolSec}</select></td>
+        <td><input type="checkbox" class="etkin" ${k.etkin ? "checked" : ""} ${ben ? "disabled" : ""}></td>
+        <td class="ipucu">${k.son_giris ? new Date(k.son_giris * 1000).toLocaleString("tr-TR") : "–"}</td>
+        <td class="eylem"><button class="btn" data-eylem="gecmis">Geçmiş</button> <button class="btn" data-eylem="kaydet">Kaydet</button> <button class="btn" data-eylem="parola">Parola</button> ${ben ? "" : '<button class="btn btn-tehlike" data-eylem="sil">Sil</button>'}</td>
+      </tr>`;
+    }).join("");
+  }
+  $("#kullanici-tablo").addEventListener("click", async (e) => {
+    const b = e.target.closest("button[data-eylem]"); if (!b) return;
+    const tr = b.closest("tr"), id = Number(tr.dataset.id), ben = st.ben && id === st.ben.id;
+    try {
+      if (b.dataset.eylem === "gecmis") { await gecmisAc(id); return; }
+      if (b.dataset.eylem === "kaydet") {
+        const govde = { ad: $(".ad", tr).value };
+        if (!ben) { govde.rol = $(".rol", tr).value; govde.etkin = $(".etkin", tr).checked; }
+        await put(`/api/kullanicilar/${id}`, govde); bildir("Kaydedildi");
+      } else if (b.dataset.eylem === "parola") {
+        const p = prompt("Bu kullanıcı için yeni parola (en az 8 karakter):"); if (!p) return;
+        await put(`/api/kullanicilar/${id}`, { parola: p }); bildir("Parola değiştirildi; kullanıcının oturumları kapatıldı");
+      } else if (b.dataset.eylem === "sil") {
+        if (!confirm(`${$("td", tr).textContent.trim()} silinsin mi?`)) return;
+        await del(`/api/kullanicilar/${id}`); bildir("Silindi");
+      }
+      kullaniciTablo((await api("/api/kullanicilar")).kullanicilar);
+    } catch (err) { bildir(err.message, 6000); }
+  });
+  $("#yeni-kullanici").addEventListener("submit", async (e) => {
+    e.preventDefault(); const f = e.target;
+    try {
+      await post("/api/kullanicilar", { kullanici_adi: f.kullanici_adi.value.trim(), ad: f.ad.value.trim(), rol: f.rol.value, parola: f.parola.value });
+      f.reset(); bildir("Kullanıcı eklendi"); kullaniciTablo((await api("/api/kullanicilar")).kullanicilar);
+    } catch (err) { bildir(err.message, 6000); }
+  });
+  const EYLEM_AD = { giris: "Giriş yaptı", giris_basarisiz: "Başarısız giriş", cikis: "Çıkış yaptı", kurulum: "İlk kurulum",
+    parola_degistirdi: "Parolasını değiştirdi", kullanici_ekledi: "Kullanıcı ekledi", kullanici_guncelledi: "Kullanıcı güncelledi", kullanici_sildi: "Kullanıcı sildi",
+    yazici_ekledi: "Yazıcı ekledi", yazici_guncelledi: "Yazıcı güncelledi", yazici_sildi: "Yazıcı sildi", tarama_baslatti: "Ağ taraması başlattı",
+    bildirim_ayarladi: "Bildirim ayarı değiştirdi", komut_duraklat: "Baskıyı durdurdu (duraklattı)", komut_surdur: "Baskıyı başlattı (sürdürdü)",
+    komut_durdur: "Baskıyı iptal etti", komut_isik: "Işığı değiştirdi", komut_nozul: "Nozul sıcaklığı ayarladı", komut_tabla: "Tabla sıcaklığı ayarladı",
+    komut_fan: "Fan ayarladı", dosya_yukledi: "Dosya yükledi" };
+  async function gecmisAc(id) {
+    try {
+      const v = await api(`/api/kullanicilar/${id}/gecmis`);
+      $("#gecmis-baslik").textContent = `İşlem geçmişi — ${v.kullanici.ad || v.kullanici.kullanici_adi} (${v.kullanici.kullanici_adi})`;
+      $("#gecmis-tablo tbody").innerHTML = v.gecmis.map(g => `<tr class="${g.eylem === "komut_durdur" || g.eylem === "giris_basarisiz" ? "kritik" : ""}">
+        <td class="zaman">${new Date(g.zaman * 1000).toLocaleString("tr-TR")}</td><td>${kacis(g.kullanici_adi)}</td>
+        <td class="eylem">${kacis(EYLEM_AD[g.eylem] || g.eylem)}</td><td>${kacis(g.hedef)}</td><td>${kacis(g.ayrinti)}</td><td class="ipucu">${kacis(g.ip)}</td></tr>`).join("")
+        || '<tr><td colspan="6" class="ipucu">Henüz kayıt yok.</td></tr>';
+      ac("ortu-gecmis");
+    } catch (e) { bildir(e.message); }
+  }
+  $("#btn-kullanicilar").addEventListener("click", kullanicilarAc);
+  $("#btn-parola").addEventListener("click", () => { $("#parola-form").reset(); ac("ortu-parola"); });
+  $("#parola-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); const f = e.target;
+    if (f.yeni.value !== f.yeni2.value) { bildir("Yeni parolalar eşleşmiyor"); return; }
+    try { await put("/api/ben/parola", { eski: f.eski.value, yeni: f.yeni.value }); kapat("ortu-parola"); bildir("Parolanız değiştirildi"); }
+    catch (err) { bildir(err.message, 6000); }
+  });
+  $("#btn-cikis").addEventListener("click", async () => {
+    if (st.ws) { st.ws.onclose = null; st.ws.close(); }
+    try { await post("/api/cikis"); } finally { location.href = "/giris"; }
+  });
+
   // ---------- genel ----------
   function ac(id) { $("#" + id).hidden = false; }
   function kapat(id) { $("#" + id).hidden = true; if (id === "ortu-ayrinti") { st.acikYazici = null; $("#ay-form").dataset.id = ""; } }
@@ -395,5 +488,5 @@
   $("#btn-sihirbaz-2").addEventListener("click", sihirbazAc);
 
   api("/api/surum").then(v => { $("#surum").textContent = `${v.urun} ${v.surum}`; }).catch(() => {});
-  wsBaglan();
+  api("/api/ben").then(v => { st.ben = v.kullanici; rolUygula(); wsBaglan(); }).catch(() => {});
 })();

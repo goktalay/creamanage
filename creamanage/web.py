@@ -12,6 +12,7 @@ from aiohttp import WSMsgType, web
 
 from . import k2_protokol as P
 from .filo import Filo
+from .kullanicilar import CEREZ_ADI, OTURUM_EN_FAZLA_SN, ROL_ADLARI, KullaniciYonetimi, gorunum as k_gorunum, yetkili_mi
 from .telegram import TelegramBildirici
 from .surum import FIRMA, SURUM, URUN_ADI, URUN_KODU
 
@@ -46,8 +47,41 @@ def _ip_dogrula(ip: str) -> str:
         raise web.HTTPBadRequest(text=f"geçersiz IP: {ip}")
 
 
-def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> web.Application:
-    app = web.Application()
+# Kimlik gerektirmeyen yollar
+ACIK_YOLLAR = {"/giris", "/api/giris", "/api/kurulum", "/api/surum"}
+
+
+def gerekli_rol(yontem: str, yol: str) -> str:
+    """Her istek için en düşük yeterli rol."""
+    if yol.startswith("/api/kullanicilar"):
+        return "sistem_yoneticisi"
+    if yol in ("/api/cikis", "/api/ben", "/api/ben/parola"):
+        return "gozetmen"
+    if yontem in ("POST", "PUT", "DELETE", "PATCH"):
+        return "yazici_yoneticisi"
+    return "gozetmen"
+
+
+def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
+                     kullanicilar: KullaniciYonetimi | None = None) -> web.Application:
+    ky = kullanicilar or KullaniciYonetimi(filo.vt)
+
+    @web.middleware
+    async def kimlik_katmani(istek: web.Request, handler):
+        yol = istek.path
+        if yol.startswith("/static/") or yol in ACIK_YOLLAR:
+            return await handler(istek)
+        k = ky.oturum_kullanicisi(istek.cookies.get(CEREZ_ADI))
+        if k is None:
+            if yol == "/":
+                raise web.HTTPFound("/giris")
+            return _hata("giriş gerekli", 401)
+        istek["kullanici"] = k
+        if not yetkili_mi(k["rol"], gerekli_rol(istek.method, yol)):
+            return _hata("bu işlem için yetkiniz yok", 403)
+        return await handler(istek)
+
+    app = web.Application(middlewares=[kimlik_katmani])
     app[FILO_ANAHTAR] = filo
     app[WS_ISTEMCILER] = weakref.WeakSet()
 
@@ -64,6 +98,135 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> w
     # --- sayfalar ---
     async def ana_sayfa(_):
         return web.FileResponse(WEB_DIZIN / "index.html")
+
+    async def giris_sayfasi(istek):
+        if ky.oturum_kullanicisi(istek.cookies.get(CEREZ_ADI)):
+            raise web.HTTPFound("/")
+        return web.FileResponse(WEB_DIZIN / "giris.html")
+
+    # --- kimlik ---
+    def _ip(istek: web.Request) -> str:
+        return istek.headers.get("X-Forwarded-For", "").split(",")[0].strip() or (istek.remote or "")
+
+    def _denetim(istek: web.Request, eylem: str, hedef: str = "", ayrinti: str = "",
+                 kullanici: dict | None = None, kullanici_adi: str | None = None) -> None:
+        k = kullanici if kullanici is not None else istek.get("kullanici")
+        filo.vt.denetim_ekle(k["id"] if k else None, (k["kullanici_adi"] if k else kullanici_adi) or "",
+                             eylem, hedef, ayrinti, _ip(istek))
+
+    def _yazici_etiketi(yid: int) -> str:
+        k = filo.kayitlar.get(yid) or {}
+        return f"{k.get('ad', yid)} ({k.get('ip', '')})"
+
+    def _cerez_yaz(yanit: web.Response, token: str) -> web.Response:
+        yanit.set_cookie(CEREZ_ADI, token, httponly=True, samesite="Lax", max_age=OTURUM_EN_FAZLA_SN, path="/")
+        return yanit
+
+    async def kurulum_durum(_):
+        return _json({"kurulum_gerekli": not ky.kullanici_var_mi(), "roller": ROL_ADLARI})
+
+    async def kurulum_yap(istek):
+        """İlk sistem yöneticisi — yalnız hiç kullanıcı yokken çalışır."""
+        if ky.kullanici_var_mi():
+            return _hata("kurulum zaten yapılmış", 409)
+        v = await _govde(istek)
+        try:
+            k = ky.ekle(str(v.get("kullanici_adi", "")), str(v.get("ad", "")), "sistem_yoneticisi", str(v.get("parola", "")))
+        except ValueError as e:
+            return _hata(str(e))
+        sonuc = ky.giris(k["kullanici_adi"], str(v.get("parola", "")), _ip(istek))
+        _denetim(istek, "kurulum", "", "ilk sistem yöneticisi oluşturuldu", kullanici=k)
+        await filo._olay("kullanici", f"İlk sistem yöneticisi oluşturuldu: {k['kullanici_adi']}", None, {"kullanici": k["kullanici_adi"]})
+        return _cerez_yaz(_json({"kullanici": sonuc["kullanici"]}, 201), sonuc["token"])
+
+    async def giris(istek):
+        v = await _govde(istek)
+        try:
+            sonuc = ky.giris(str(v.get("kullanici_adi", "")), str(v.get("parola", "")), _ip(istek))
+        except ValueError as e:
+            log.warning("başarısız giriş: %s (%s)", v.get("kullanici_adi"), _ip(istek))
+            _denetim(istek, "giris_basarisiz", "", str(e), kullanici_adi=str(v.get("kullanici_adi", ""))[:64])
+            return _hata(str(e), 401)
+        log.info("giriş: %s (%s)", sonuc["kullanici"]["kullanici_adi"], _ip(istek))
+        _denetim(istek, "giris", "", "", kullanici=sonuc["kullanici"])
+        return _cerez_yaz(_json({"kullanici": sonuc["kullanici"]}), sonuc["token"])
+
+    async def cikis(istek):
+        _denetim(istek, "cikis")
+        ky.cikis(istek.cookies.get(CEREZ_ADI))
+        yanit = _json({"cikis": True})
+        yanit.del_cookie(CEREZ_ADI, path="/")
+        return yanit
+
+    async def ben(istek):
+        return _json({"kullanici": k_gorunum(istek["kullanici"])})
+
+    async def ben_parola(istek):
+        v = await _govde(istek)
+        try:
+            ky.parola_degistir(istek["kullanici"]["id"], str(v.get("eski", "")), str(v.get("yeni", "")),
+                               istek.cookies.get(CEREZ_ADI))
+        except ValueError as e:
+            return _hata(str(e))
+        _denetim(istek, "parola_degistirdi", "", "kendi parolası")
+        return _json({"degisti": True})
+
+    # --- kullanıcı yönetimi (yalnız sistem yöneticisi; rol denetimi ara katmanda) ---
+    async def kullanici_listesi(_):
+        return _json({"kullanicilar": ky.listele(), "roller": ROL_ADLARI})
+
+    async def kullanici_ekle(istek):
+        v = await _govde(istek)
+        try:
+            k = ky.ekle(str(v.get("kullanici_adi", "")), str(v.get("ad", "")), str(v.get("rol", "")), str(v.get("parola", "")))
+        except ValueError as e:
+            return _hata(str(e))
+        _denetim(istek, "kullanici_ekledi", k["kullanici_adi"], k["rol_adi"])
+        await filo._olay("kullanici", f"Kullanıcı eklendi: {k['kullanici_adi']} ({k['rol_adi']}) — {istek['kullanici']['kullanici_adi']}", None)
+        return _json({"kullanici": k}, 201)
+
+    async def kullanici_guncelle(istek):
+        kid = int(istek.match_info["id"])
+        v = await _govde(istek)
+        if kid == istek["kullanici"]["id"] and ("rol" in v or v.get("etkin") is False):
+            return _hata("kendi rolünüzü ya da etkinliğinizi değiştiremezsiniz")
+        try:
+            k = ky.guncelle(kid, ad=v.get("ad"), rol=v.get("rol"), etkin=v.get("etkin"), parola=v.get("parola") or None)
+        except LookupError as e:
+            return _hata(str(e), 404)
+        except ValueError as e:
+            return _hata(str(e))
+        degisen = ", ".join(x for x, var in (("ad", v.get("ad") is not None), ("rol", v.get("rol") is not None),
+                                              ("etkin", v.get("etkin") is not None), ("parola", bool(v.get("parola")))) if var)
+        _denetim(istek, "kullanici_guncelledi", k["kullanici_adi"], f"{degisen} → {k['rol_adi']}, {'etkin' if k['etkin'] else 'pasif'}")
+        return _json({"kullanici": k})
+
+    async def kullanici_sil(istek):
+        kid = int(istek.match_info["id"])
+        if kid == istek["kullanici"]["id"]:
+            return _hata("kendinizi silemezsiniz")
+        silinen = filo.vt.kullanici(kid)
+        try:
+            ky.sil(kid)
+        except LookupError as e:
+            return _hata(str(e), 404)
+        except ValueError as e:
+            return _hata(str(e))
+        _denetim(istek, "kullanici_sildi", silinen["kullanici_adi"] if silinen else str(kid))
+        await filo._olay("kullanici", f"Kullanıcı silindi: {silinen['kullanici_adi'] if silinen else kid} — {istek['kullanici']['kullanici_adi']}", None)
+        return _json({"silindi": kid})
+
+    async def kullanici_gecmis(istek):
+        kid = int(istek.match_info["id"])
+        k = filo.vt.kullanici(kid)
+        if k is None:
+            return _hata("kullanıcı bulunamadı", 404)
+        limit = min(int(istek.query.get("limit", "300")), 2000)
+        return _json({"kullanici": k_gorunum(k), "gecmis": filo.vt.denetim_listesi(kid, limit, k["kullanici_adi"])})
+
+    async def denetim_listesi(istek):
+        limit = min(int(istek.query.get("limit", "300")), 2000)
+        return _json({"gecmis": filo.vt.denetim_listesi(None, limit)})
 
     # --- API ---
     async def surum(_):
@@ -88,6 +251,7 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> w
         kayit = await filo.yazici_ekle(str(v.get("ad", "")), ip, port,
                                        model=str(v.get("model", "")), hostname=str(v.get("hostname", "")),
                                        grup=str(v.get("grup", "")), notlar=str(v.get("notlar", "")))
+        _denetim(istek, "yazici_ekledi", f"{kayit['ad']} ({ip})")
         return _json({"yazici": kayit}, 201)
 
     async def toplu_ekle(istek):
@@ -111,6 +275,8 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> w
                                            model=str(s.get("model", "")), hostname=str(s.get("hostname", "")),
                                            grup=str(s.get("grup", "")))
             eklenen.append(kayit)
+        if eklenen:
+            _denetim(istek, "yazici_ekledi", f"{len(eklenen)} yazıcı (tarama)", ", ".join(k["ip"] for k in eklenen))
         return _json({"eklenen": eklenen, "atlanan": atlanan}, 201)
 
     async def yazici_guncelle(istek):
@@ -132,12 +298,15 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> w
         kayit = await filo.yazici_guncelle(yid, **alanlar)
         if kayit is None:
             return _hata("yazıcı bulunamadı", 404)
+        _denetim(istek, "yazici_guncelledi", _yazici_etiketi(yid), ", ".join(f"{k}={v}" for k, v in alanlar.items()))
         return _json({"yazici": kayit})
 
     async def yazici_sil(istek):
         yid = int(istek.match_info["id"])
+        etiket = _yazici_etiketi(yid)
         if not await filo.yazici_sil(yid):
             return _hata("yazıcı bulunamadı", 404)
+        _denetim(istek, "yazici_sildi", etiket)
         return _json({"silindi": yid})
 
     async def komut(istek):
@@ -150,6 +319,10 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> w
             sonuc = await filo.komut(yid, ad, v.get("deger"))
         except ValueError as e:
             return _hata(str(e))
+        dosya = (filo.baglantilar[yid].ozet().get("dosya") if yid in filo.baglantilar else "") or ""
+        _denetim(istek, f"komut_{ad}", _yazici_etiketi(yid),
+                 (f"dosya: {dosya}; " if dosya else "") + (f"değer: {v.get('deger')}; " if v.get("deger") is not None else "")
+                 + ("gönderildi" if sonuc else "GÖNDERİLEMEDİ: yazıcı bağlı değil"))
         return _json({"gonderildi": sonuc})
 
     async def aglar(_):
@@ -168,6 +341,7 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> w
             t = filo.tarama_baslat(cidr, int(v.get("port") or P.WS_PORT))
         except RuntimeError as e:
             return _hata(str(e), 409)
+        _denetim(istek, "tarama_baslatti", cidr)
         return _json({"tarama": filo.tarama_gorunum(), "id": t.id}, 202)
 
     async def tarama_durum(_):
@@ -202,6 +376,9 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> w
             gorunum = tg.kaydet(v)
         except ValueError as e:
             return _hata(str(e))
+        _denetim(istek, "bildirim_ayarladi", "Telegram",
+                 ", ".join(x for x, var in (("belirteç", bool(str(v.get("token") or "").strip())), ("sohbetler", "sohbetler" in v),
+                                            ("olaylar", "olaylar" in v), ("etkin", "etkin" in v)) if var))
         uyari = ""
         if tg.ayar["token"]:
             try:
@@ -241,7 +418,7 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> w
         app[WS_ISTEMCILER].add(ws)
         try:
             await ws.send_str(json.dumps({
-                "tur": "anlik", "yazicilar": filo.yazicilar_gorunum(),
+                "tur": "anlik", "kullanici": k_gorunum(istek["kullanici"]), "yazicilar": filo.yazicilar_gorunum(),
                 "sayilar": filo.ozet_sayilar(), "olaylar": filo.vt.olaylar(50),
                 "tarama": filo.tarama_gorunum()}, ensure_ascii=False))
             async for msg in ws:
@@ -252,6 +429,19 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None) -> w
         return ws
 
     app.router.add_get("/", ana_sayfa)
+    app.router.add_get("/giris", giris_sayfasi)
+    app.router.add_get("/api/kurulum", kurulum_durum)
+    app.router.add_post("/api/kurulum", kurulum_yap)
+    app.router.add_post("/api/giris", giris)
+    app.router.add_post("/api/cikis", cikis)
+    app.router.add_get("/api/ben", ben)
+    app.router.add_put("/api/ben/parola", ben_parola)
+    app.router.add_get("/api/kullanicilar", kullanici_listesi)
+    app.router.add_post("/api/kullanicilar", kullanici_ekle)
+    app.router.add_put(r"/api/kullanicilar/{id:\d+}", kullanici_guncelle)
+    app.router.add_delete(r"/api/kullanicilar/{id:\d+}", kullanici_sil)
+    app.router.add_get(r"/api/kullanicilar/{id:\d+}/gecmis", kullanici_gecmis)
+    app.router.add_get("/api/kullanicilar/gecmis", denetim_listesi)
     app.router.add_get("/api/surum", surum)
     app.router.add_get("/api/yazicilar", yazicilar)
     app.router.add_post("/api/yazicilar", yazici_ekle)

@@ -6,18 +6,26 @@ Creality **K2 Plus (Combo)** 3D yazıcı filosunu (hedef: 56 cihaz) yerel ağ ü
 Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sunduğu
 **WebSocket 9999** arayüzü kullanılır (root, Moonraker, bulut yok). Garanti korunur.
 
-## Sürüm 0.2.0 — ne yapar
+## Sürüm 0.3.0 — ne yapar
 
+- **Kullanıcı girişi ve roller:** herkes kullanıcı adı ve parola ile girer. Üç rol:
+  **Sistem Yöneticisi** (her şey + kullanıcı yönetimi ve işlem geçmişi), **Yazıcı Yöneticisi**
+  (kullanıcı yönetimi dışında her şey: yazıcı ekleme/silme, komutlar, tarama, bildirim
+  ayarları, dosya yükleme), **Gözetmen** (yalnız izler). Rol denetimi her API ucunda
+  sunucu tarafında yapılır; arayüz yalnız yetkili düğmeleri gösterir.
+- **İşlem geçmişi (denetim kaydı):** giriş/çıkış, komutlar (durdur/başlat/iptal, hangi
+  yazıcı, hangi dosya), yazıcı ekleme/silme, tarama, bildirim ayarı, kullanıcı işlemleri
+  zaman ve IP ile kaydedilir; sistem yöneticisi kullanıcı başına görüntüler.
 - **Ağ tarama sihirbazı:** makinedeki alt ağları listeler, seçilen CIDR'da 9999 portunu
   paralel yoklar, yanıt verenlere WebSocket ile kimlik (hostname, model) sorar; bulunanları
   ad ve grup vererek toplu ekler. Elle IP ile ekleme de vardır.
 - **Canlı gösterge paneli:** her yazıcı için durum (basıyor / boşta / duraklatıldı /
   tamamlandı / hata / hazırlanıyor / çevrimdışı), dosya, ilerleme, katman, kalan süre,
   nozul/tabla/kabin sıcaklıkları. Durum sayaçları, arama, durum ve grup filtresi.
-- **Ayrıntı paneli:** tüm alanlar, ham telemetri, yazıcıya özel olay geçmişi, düzenleme
-  (ad, IP, port, grup, not, bağlantı etkin/kapalı), silme.
-- **Temel komutlar:** duraklat, sürdür, durdur, ışık aç/kapat. (API'de ayrıca nozul,
-  tabla, fan.)
+- **Ayrıntı paneli:** tüm alanlar, yazıcıya özel olay geçmişi, düzenleme (ad, IP, port,
+  grup, not, bağlantı etkin/kapalı), silme.
+- **Komutlar:** Durdur (duraklat), Başlat (sürdür), İptal Et, ışık aç/kapat; duruma göre
+  yalnız anlamlı olanlar etkin. Gözetmen komut veremez. (API'de ayrıca nozul, tabla, fan.)
 - **Olay akışı:** bağlantı kuruldu/koptu, baskı başladı/bitti/duraklatıldı, hata,
   filament bitti. SQLite'a yazılır, arayüze anlık itilir.
 - **Telegram bildirimleri:** hata oluştuğunda ve baskı tamamlandığında (isteğe bağlı:
@@ -35,6 +43,20 @@ cd creamanage
 pip3 install -r requirements.txt
 python3 main.py --port 8090          # http://<sunucu>:8090/
 ```
+
+İlk açılışta `/giris` sayfası, sistemde kullanıcı olmadığı için **ilk Sistem Yöneticisi**
+hesabını oluşturmanızı ister (parola koda ya da depoya yazılmaz). Sonraki kullanıcılar
+arayüzdeki **Kullanıcılar** penceresinden eklenir. Parola unutulursa sunucuda:
+
+```bash
+python3 araclar/kullanici.py listele
+python3 araclar/kullanici.py parola <kullanici_adi>
+python3 araclar/kullanici.py ekle <kullanici_adi> --ad "Ad Soyad" --rol sistem_yoneticisi
+```
+
+Parolalar PBKDF2-HMAC-SHA256 ile hash'lenir; oturumlar sunucuda tutulur (12 saat
+kullanılmazsa düşer), tarayıcıya yalnız HttpOnly çerez verilir. 5 başarısız girişte
+60 sn kilit. Ağ dışından erişim açılacaksa HTTPS (ters vekil) önerilir.
 
 Ortam değişkenleri: `CREAMANAGE_HOST`, `CREAMANAGE_PORT`, `CREAMANAGE_VERITABANI`,
 `CREAMANAGE_LOG`. Komut satırı: `--host`, `--port`, `--veritabani`, `--log`.
@@ -78,7 +100,7 @@ Simülatör telemetri, kalp atışı ve `pause/stop/lightSw` komutlarını takli
 
 ```bash
 cd testler
-python3 -m unittest -v test_k2_protokol test_filo_uctan_uca test_telegram
+python3 -m unittest -v test_kullanicilar test_k2_protokol test_filo_uctan_uca test_telegram
 ```
 
 Telegram testleri sahte bir Telegram API sunucusuyla çalışır, internet gerekmez.
@@ -100,7 +122,8 @@ creamanage/
   veritabani.py    SQLite: yazicilar, olaylar
   olaylar.py       durum geçişi → olay; abone modeli (uyarı kanalları buraya takılır)
   filo.py          kayıt + bağlantı + tarama + olay orkestrasyonu, arayüz yayını (≤1/s/yazıcı)
-  web.py           aiohttp: statik arayüz, REST API, /ws tarayıcı yayını
+  kullanicilar.py  roller, parola hash'i, oturumlar, giriş kilidi
+  web.py           aiohttp: kimlik/rol ara katmanı, statik arayüz, REST API, /ws yayını
   telegram.py      Telegram bildirim kanalı (OlayMerkezi abonesi, toplu gönderim, 429 uyumu)
 web/               index.html, css/stil.css, js/uygulama.js (bağımlılıksız)
 araclar/sahte_yazici.py   K2 simülatörü
@@ -111,6 +134,10 @@ testler/           birim ve uçtan uca testler
 
 | Uç | İşlev |
 |---|---|
+| `GET /api/kurulum`, `POST /api/kurulum` | ilk yönetici kurulumu (yalnız kullanıcı yokken) |
+| `POST /api/giris`, `POST /api/cikis`, `GET /api/ben`, `PUT /api/ben/parola` | oturum |
+| `GET/POST /api/kullanicilar`, `PUT/DELETE /api/kullanicilar/{id}` | kullanıcı yönetimi (sistem yöneticisi) |
+| `GET /api/kullanicilar/{id}/gecmis`, `GET /api/kullanicilar/gecmis` | işlem geçmişi (sistem yöneticisi) |
 | `GET /api/surum` | ürün, sürüm, firma |
 | `GET /api/yazicilar` | tüm yazıcılar + canlı özet + durum sayıları |
 | `POST /api/yazicilar` | `{ad, ip, port?, grup?, notlar?}` |
@@ -157,7 +184,7 @@ Kamera: K2 ailesi WebRTC (`http://<ip>:8000/call/webrtc_local`); bu sürümde yo
    sessize alma ve vardiya saatleri. Telegram kanalı 0.2.0'da geldi.
 2. Gerçek K2 Plus ile alan/durum doğrulaması, CFS (boxsInfo) kutu-slot görünümü.
 3. Kamera önizlemesi (WebRTC → go2rtc).
-4. Kullanıcı girişi ve yetki (izle / komut ver), HTTPS.
+4. HTTPS (ters vekil), oturum listesi ve uzaktan kapatma.
 5. Dosya gönderme ve baskı başlatma (HTTP yükleme + `opGcodeFile`), iş kuyruğu.
 6. Geçmiş raporları: yazıcı kullanım oranı, baskı süreleri, hata sıklığı.
 7. Kurulum paketleri (`.deb`, Windows kurulum) ve systemd servisi.

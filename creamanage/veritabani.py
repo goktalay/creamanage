@@ -34,6 +34,34 @@ CREATE TABLE IF NOT EXISTS ayarlar (
     anahtar TEXT PRIMARY KEY,
     deger TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS kullanicilar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kullanici_adi TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    ad TEXT NOT NULL DEFAULT '',
+    rol TEXT NOT NULL,
+    parola_hash TEXT NOT NULL,
+    etkin INTEGER NOT NULL DEFAULT 1,
+    olusturma REAL NOT NULL,
+    son_giris REAL
+);
+CREATE TABLE IF NOT EXISTS denetim (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    zaman REAL NOT NULL,
+    kullanici_id INTEGER,
+    kullanici_adi TEXT NOT NULL DEFAULT '',
+    eylem TEXT NOT NULL,
+    hedef TEXT NOT NULL DEFAULT '',
+    ayrinti TEXT NOT NULL DEFAULT '',
+    ip TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS denetim_kullanici ON denetim(kullanici_id, id DESC);
+CREATE TABLE IF NOT EXISTS oturumlar (
+    token TEXT PRIMARY KEY,
+    kullanici_id INTEGER NOT NULL,
+    olusturma REAL NOT NULL,
+    son_kullanim REAL NOT NULL,
+    ip TEXT NOT NULL DEFAULT ''
+);
 """
 
 
@@ -141,3 +169,104 @@ class Veritabani:
                 d["veri"] = {}
             sonuc.append(d)
         return sonuc
+
+    # --- kullanıcılar ---
+    def kullanicilar(self) -> list[dict]:
+        with self._kilit:
+            satirlar = self._bag.execute("SELECT * FROM kullanicilar ORDER BY kullanici_adi").fetchall()
+        return [dict(s) for s in satirlar]
+
+    def kullanici(self, kullanici_id: int) -> dict | None:
+        with self._kilit:
+            s = self._bag.execute("SELECT * FROM kullanicilar WHERE id=?", (kullanici_id,)).fetchone()
+        return dict(s) if s else None
+
+    def kullanici_adiyla(self, kullanici_adi: str) -> dict | None:
+        with self._kilit:
+            s = self._bag.execute("SELECT * FROM kullanicilar WHERE kullanici_adi=? COLLATE NOCASE",
+                                  (kullanici_adi.strip(),)).fetchone()
+        return dict(s) if s else None
+
+    def kullanici_ekle(self, kullanici_adi: str, ad: str, rol: str, parola_hash: str) -> dict:
+        with self._kilit:
+            cur = self._bag.execute(
+                "INSERT INTO kullanicilar(kullanici_adi, ad, rol, parola_hash, olusturma) VALUES (?,?,?,?,?)",
+                (kullanici_adi.strip(), ad.strip(), rol, parola_hash, time.time()))
+            self._bag.commit()
+            yeni_id = cur.lastrowid
+        k = self.kullanici(int(yeni_id))
+        assert k is not None
+        return k
+
+    def kullanici_guncelle(self, kullanici_id: int, **alanlar) -> dict | None:
+        izinli = {"ad", "rol", "parola_hash", "etkin", "son_giris", "kullanici_adi"}
+        alanlar = {k: v for k, v in alanlar.items() if k in izinli}
+        if alanlar:
+            sql = ", ".join(f"{k}=?" for k in alanlar)
+            with self._kilit:
+                self._bag.execute(f"UPDATE kullanicilar SET {sql} WHERE id=?", (*alanlar.values(), kullanici_id))
+                self._bag.commit()
+        return self.kullanici(kullanici_id)
+
+    def kullanici_sil(self, kullanici_id: int) -> bool:
+        with self._kilit:
+            cur = self._bag.execute("DELETE FROM kullanicilar WHERE id=?", (kullanici_id,))
+            self._bag.execute("DELETE FROM oturumlar WHERE kullanici_id=?", (kullanici_id,))
+            self._bag.commit()
+        return cur.rowcount > 0
+
+    # --- oturumlar ---
+    def oturum_ekle(self, token: str, kullanici_id: int, ip: str) -> None:
+        simdi = time.time()
+        with self._kilit:
+            self._bag.execute("INSERT INTO oturumlar(token, kullanici_id, olusturma, son_kullanim, ip) VALUES (?,?,?,?,?)",
+                              (token, kullanici_id, simdi, simdi, ip))
+            self._bag.commit()
+
+    def oturum(self, token: str) -> dict | None:
+        with self._kilit:
+            s = self._bag.execute("SELECT * FROM oturumlar WHERE token=?", (token,)).fetchone()
+        return dict(s) if s else None
+
+    def oturum_dokun(self, token: str) -> None:
+        with self._kilit:
+            self._bag.execute("UPDATE oturumlar SET son_kullanim=? WHERE token=?", (time.time(), token))
+            self._bag.commit()
+
+    def oturum_sil(self, token: str) -> None:
+        with self._kilit:
+            self._bag.execute("DELETE FROM oturumlar WHERE token=?", (token,))
+            self._bag.commit()
+
+    def oturumlari_sil(self, kullanici_id: int, haric_token: str | None = None) -> None:
+        with self._kilit:
+            if haric_token:
+                self._bag.execute("DELETE FROM oturumlar WHERE kullanici_id=? AND token<>?", (kullanici_id, haric_token))
+            else:
+                self._bag.execute("DELETE FROM oturumlar WHERE kullanici_id=?", (kullanici_id,))
+            self._bag.commit()
+
+    def eski_oturumlari_temizle(self, esik_zaman: float) -> None:
+        with self._kilit:
+            self._bag.execute("DELETE FROM oturumlar WHERE son_kullanim < ?", (esik_zaman,))
+            self._bag.commit()
+
+    # --- denetim (kullanıcı işlem geçmişi) ---
+    def denetim_ekle(self, kullanici_id: int | None, kullanici_adi: str, eylem: str,
+                     hedef: str = "", ayrinti: str = "", ip: str = "") -> None:
+        with self._kilit:
+            self._bag.execute(
+                "INSERT INTO denetim(zaman, kullanici_id, kullanici_adi, eylem, hedef, ayrinti, ip) VALUES (?,?,?,?,?,?,?)",
+                (time.time(), kullanici_id, kullanici_adi, eylem, hedef, ayrinti[:500], ip))
+            self._bag.commit()
+
+    def denetim_listesi(self, kullanici_id: int | None = None, limit: int = 200,
+                        kullanici_adi: str | None = None) -> list[dict]:
+        with self._kilit:
+            if kullanici_id is not None:
+                satirlar = self._bag.execute(
+                    "SELECT * FROM denetim WHERE kullanici_id=? OR (kullanici_id IS NULL AND kullanici_adi=?)"
+                    " ORDER BY id DESC LIMIT ?", (kullanici_id, kullanici_adi or "", limit)).fetchall()
+            else:
+                satirlar = self._bag.execute("SELECT * FROM denetim ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(s) for s in satirlar]
