@@ -103,3 +103,16 @@ progress#tarama-cubuk { width: 100%; height: 12px; }
 .form .satir label.genis { flex: 1; }
 .kucuk-liste label { padding: 5px 8px; font-size: 13px; }
 .kucuk-liste:empty { display: none; }
+
+.secici { display: inline-flex; border: 1px solid var(--kenar); border-radius: 6px; overflow: hidden; }
+.secici button { border: 0; background: var(--panel); padding: 6px 10px; cursor: pointer; color: var(--soluk); }
+.secici button.aktif { background: var(--birincil); color: #fff; }
+.sade { width: 100%; border-collapse: collapse; font-size: 14px; }
+.sade th { text-align: left; color: var(--soluk); font-weight: 500; font-size: 12px; padding: 4px 8px; border-bottom: 1px solid var(--kenar); }
+.sade td { padding: 7px 8px; border-bottom: 1px solid var(--kenar); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; }
+.sade tr { cursor: pointer; }
+.sade tr:hover td { background: rgba(127,127,127,.08); }
+.sade td.ad { width: 28%; font-weight: 600; }
+.sade td.ad::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; background: var(--renk); vertical-align: 1px; }
+.sade td.yuzde, .sade th.sag-hiza { text-align: right; width: 90px; color: var(--soluk); }
+.sade tr.cevrimdisi td { opacity: .6; }

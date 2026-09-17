@@ -39,10 +39,18 @@
         <option value="cevrimdisi">Çevrimdışı</option>
       </select>
       <select id="filtre-grup"><option value="">Tüm gruplar</option></select>
+      <div class="secici" id="gorunum-secici" title="Görünüm">
+        <button type="button" data-gorunum="kart" class="aktif">Kartlar</button>
+        <button type="button" data-gorunum="sade">Sade</button>
+      </div>
       <span class="bosluk"></span>
       <span class="ipucu" id="sonuc-sayisi"></span>
     </div>
     <div class="kartlar" id="kartlar"></div>
+    <table class="sade" id="sade" hidden>
+      <thead><tr><th>Yazıcı</th><th>Dosya</th><th class="sag-hiza">İlerleme</th></tr></thead>
+      <tbody></tbody>
+    </table>
     <div class="bos" id="bos" hidden>
       <p>Henüz yazıcı yok.</p>
       <button class="btn btn-birincil" id="btn-sihirbaz-2">Ağı tarayıp yazıcı ekle</button>

@@ -11,7 +11,8 @@
   const $ = (s, k) => (k || document).querySelector(s);
   const $$ = (s, k) => Array.from((k || document).querySelectorAll(s));
 
-  const st = { yazicilar: new Map(), olaylar: [], tarama: null, acikYazici: null, ws: null };
+  const st = { yazicilar: new Map(), olaylar: [], tarama: null, acikYazici: null, ws: null, gorunum: "kart" };
+  try { st.gorunum = localStorage.getItem("creamanage.gorunum") === "sade" ? "sade" : "kart"; } catch (e) { /* özel pencere */ }
 
   // ---------- yardımcılar ----------
   function kacis(s) {
@@ -109,7 +110,33 @@
       <div class="satir-bilgi"><span>${ilerleme == null ? "" : "%" + ilerleme}</span><span>${c.katman != null && c.toplam_katman ? `katman ${c.katman}/${c.toplam_katman}` : ""}</span><span>${c.kalan_sn != null && d === "basiyor" ? "kalan " + sure(c.kalan_sn) : ""}</span></div>
       <div class="sicaklik"><span>Nozul <b>${derece(c.nozul, c.nozul_hedef)}</b></span><span>Tabla <b>${derece(c.tabla, c.tabla_hedef)}</b></span><span>Kabin <b>${derece(c.kabin, c.kabin_hedef)}</b></span>${c.filament_yok ? '<span class="olay-kritik">Filament yok</span>' : ""}</div>`;
   }
+  function sadeSatirHtml(y) {
+    const c = y.canli || {}, d = c.durum || "cevrimdisi";
+    const ilerleme = c.ilerleme != null && d !== "bosta" && d !== "cevrimdisi" ? "%" + Math.round(c.ilerleme) : "";
+    return `<td class="ad" title="${kacis(y.ip)} · ${DURUM_AD[d] || d}">${kacis(y.ad)}</td>` +
+      `<td title="${kacis(c.dosya_yolu || c.dosya || "")}">${c.dosya ? kacis(c.dosya) : '<span class="ipucu">–</span>'}</td>` +
+      `<td class="yuzde">${ilerleme}</td>`;
+  }
+  function cizSade() {
+    $("#sade tbody").innerHTML = filtreli().map(y => {
+      const d = (y.canli || {}).durum || "cevrimdisi";
+      return `<tr class="${d}" data-id="${y.id}" style="--renk: var(--d-${d})">${sadeSatirHtml(y)}</tr>`;
+    }).join("");
+  }
+  function gorunumUygula() {
+    $("#kartlar").hidden = st.gorunum !== "kart";
+    $("#sade").hidden = st.gorunum !== "sade";
+    $$("#gorunum-secici button").forEach(b => b.classList.toggle("aktif", b.dataset.gorunum === st.gorunum));
+  }
   function cizKart(y) {
+    if (st.gorunum === "sade") {
+      const tr = $(`#sade tr[data-id="${y.id}"]`), gorunur = filtreli().some(f => f.id === y.id);
+      if (!gorunur) { if (tr) tr.remove(); sonucSayisi(); bosMu(); return; }
+      if (!tr) { cizHepsi(); return; }
+      const d = (y.canli || {}).durum || "cevrimdisi";
+      tr.className = d; tr.style.setProperty("--renk", `var(--d-${d})`); tr.innerHTML = sadeSatirHtml(y);
+      return;
+    }
     const gorunur = filtreli().some(f => f.id === y.id);
     let k = $(`.kart[data-id="${y.id}"]`);
     if (!gorunur) { if (k) k.remove(); sonucSayisi(); bosMu(); return; }
@@ -119,6 +146,8 @@
     k.innerHTML = kartHtml(y);
   }
   function cizHepsi() {
+    gorunumUygula();
+    if (st.gorunum === "sade") { cizSade(); cizSayaclar(); cizGruplar(); sonucSayisi(); bosMu(); return; }
     const kap = $("#kartlar");
     kap.innerHTML = filtreli().map(y => {
       const d = (y.canli || {}).durum || "cevrimdisi";
@@ -354,6 +383,12 @@
   $$(".ortu").forEach(o => o.addEventListener("click", (e) => { if (e.target === o) kapat(o.id); }));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") $$(".ortu").forEach(o => { if (!o.hidden) kapat(o.id); }); });
   $("#kartlar").addEventListener("click", (e) => { const k = e.target.closest(".kart"); if (k) ayrintiAc(Number(k.dataset.id)); });
+  $("#sade").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) ayrintiAc(Number(tr.dataset.id)); });
+  $$("#gorunum-secici button").forEach(b => b.addEventListener("click", () => {
+    st.gorunum = b.dataset.gorunum;
+    try { localStorage.setItem("creamanage.gorunum", st.gorunum); } catch (e) { /* yok say */ }
+    cizHepsi();
+  }));
   $("#sayaclar").addEventListener("click", (e) => { const s = e.target.closest(".sayac"); if (!s) return; $("#filtre-durum").value = s.dataset.d || ""; cizHepsi(); });
   ["#arama", "#filtre-durum", "#filtre-grup"].forEach(s => $(s).addEventListener("input", cizHepsi));
   $("#btn-sihirbaz").addEventListener("click", sihirbazAc);
