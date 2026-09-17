@@ -289,7 +289,10 @@
     const f = $("#tg-form"), a = tgAyar;
     f.token.value = "";
     f.token.placeholder = a.token_var ? `kayıtlı: ${a.token_maske} (değiştirmek için yenisini yazın)` : "123456789:AA…";
-    $("#tg-token-durum").textContent = a.token_var ? ("Belirteç kayıtlı" + (a.bot_adi ? ` · bot @${a.bot_adi}` : "") + ".") : "Belirteç girilmemiş.";
+    const td = $("#tg-token-durum");
+    if (!a.token_var) { td.textContent = "Belirteç girilmemiş."; td.className = "ipucu"; }
+    else if (!a.token_gecerli) { td.textContent = `Kayıtlı belirteç (${a.token_maske}) geçersiz biçimde! BotFather'ın verdiği satırı yeniden yapıştırıp kaydedin.`; td.className = "ipucu olay-kritik"; }
+    else { td.textContent = "Belirteç kayıtlı" + (a.bot_adi ? ` · bot @${a.bot_adi}` : "") + "."; td.className = "ipucu"; }
     f.sohbetler.value = a.sohbetler.join(", ");
     f.etkin.checked = a.etkin;
     $("#tg-olaylar").innerHTML = a.secilebilir.map(o =>

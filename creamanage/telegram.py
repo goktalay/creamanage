@@ -143,6 +143,7 @@ class TelegramBildirici:
         return {
             "etkin": self.ayar["etkin"],
             "token_var": bool(t),
+            "token_gecerli": token_gecerli_mi(t),
             "token_maske": (t[:6] + "…" + t[-4:]) if len(t) > 12 else ("•••" if t else ""),
             "bot_adi": self.bot_adi,
             "sohbetler": list(self.ayar["sohbetler"]),
