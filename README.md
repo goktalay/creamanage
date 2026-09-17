@@ -105,6 +105,10 @@ gösterecek şekilde açılışta başlayacak biçimde etkinleştirir. Yeniden �
 | Parola sıfırla | `sudo -u creamanage ./venv/bin/python araclar/kullanici.py --veritabani /var/lib/creamanage/creamanage.sqlite parola mkaderoglu` |
 | Yedek | `/var/lib/creamanage` dizinini kopyalayın (servis çalışırken de alınabilir, WAL modu) |
 
+**Sunucudan `git pull` için deploy key (önerilen):** `sudo bash kurulum/deploy_key.sh` çalıştırın,
+yazdırdığı açık anahtarı GitHub'da depo ayarları → Deploy keys'e ekleyin (yalnız okuma).
+Sonra `sudo git pull` parola sormaz.
+
 Veri dizinini değiştirmek için kurulumdan önce `CREAMANAGE_VERI=/baska/dizin` verin.
 Güvenlik duvarı: `sudo ufw allow 8090/tcp`. Ağ dışından erişim için önüne HTTPS ters vekil
 (nginx/caddy) koyun; kamera modülünün tarayıcı WebRTC yolu yalnız HTTP sayfada çalışır, HTTPS
