@@ -24,7 +24,8 @@ servis_yaz() {
   chmod 644 /etc/systemd/system/creamanage.service
 }
 
-"$KOK/venv/bin/pip" install -q -r "$KOK/requirements.txt"
+if ! "$KOK/venv/bin/python" -c "import sys" >/dev/null 2>&1; then rm -rf "$KOK/venv"; python3 -m venv "$KOK/venv"; fi
+"$KOK/venv/bin/python" -m pip install -q -r "$KOK/requirements.txt"
 chmod -R a+rX "$KOK"
 find "$KOK" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
 erisim_ver "$KOK"

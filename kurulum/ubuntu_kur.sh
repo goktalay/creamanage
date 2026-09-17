@@ -42,9 +42,12 @@ chown -R "$KULLANICI:$KULLANICI" "$VERI"
 chmod 750 "$VERI"
 
 echo "3) Python sanal ortamı ($KOK/venv)"
-[ -d "$KOK/venv" ] || python3 -m venv "$KOK/venv"
-"$KOK/venv/bin/pip" install -q --upgrade pip
-"$KOK/venv/bin/pip" install -q -r "$KOK/requirements.txt"
+# Klasör taşındıysa venv içindeki mutlak yollar bozulur: çalışmıyorsa sıfırdan kur
+if ! "$KOK/venv/bin/python" -c "import sys" >/dev/null 2>&1 || ! grep -q "^home = " "$KOK/venv/pyvenv.cfg" 2>/dev/null; then
+  rm -rf "$KOK/venv"; python3 -m venv "$KOK/venv"
+fi
+"$KOK/venv/bin/python" -m pip install -q --upgrade pip
+"$KOK/venv/bin/python" -m pip install -q -r "$KOK/requirements.txt"
 # Servis kullanıcısı uygulama dosyalarını okuyabilmeli (yazmaz)
 chmod -R a+rX "$KOK"
 find "$KOK" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
