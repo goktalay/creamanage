@@ -910,7 +910,7 @@
 
   // ---------- genel ----------
   function ac(id) { $("#" + id).hidden = false; }
-  function kapat(id) { $("#" + id).hidden = true; if (id === "ortu-ayrinti") { st.acikYazici = null; st.ayHata = null; $("#ay-form").dataset.id = ""; ayMenuKapat(); } }
+  function kapat(id) { if (id === "ortu-dosya-ekle" && deYukleniyor) { bildir("Yükleme sürüyor, lütfen bekleyin"); return; } $("#" + id).hidden = true; if (id === "ortu-ayrinti") { st.acikYazici = null; st.ayHata = null; $("#ay-form").dataset.id = ""; ayMenuKapat(); ayAdFormKapat(); } }
   $$("[data-kapat]").forEach(b => b.addEventListener("click", () => kapat(b.dataset.kapat)));
   $$(".ortu").forEach(o => o.addEventListener("click", (e) => { if (e.target === o) kapat(o.id); }));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") $$(".ortu").forEach(o => { if (!o.hidden) kapat(o.id); }); });
@@ -1085,31 +1085,108 @@
     const id = Number(tr.dataset.id); dsYuklemeSecili = dsYuklemeSecili === id ? null : id;
     dsYuklemelerCiz(); dsBaskilarCiz();
   });
-  $("#ds-dosya").addEventListener("change", () => {
-    const dosya = $("#ds-dosya").files[0]; if (!dosya) return;
-    const aciklama = prompt(`"${dosya.name}" için açıklama (isteğe bağlı):`, "");
-    if (aciklama === null) { $("#ds-dosya").value = ""; return; }
-    const fd = new FormData(); fd.append("file", dosya, dosya.name); fd.append("aciklama", aciklama);
-    const xhr = new XMLHttpRequest(); xhr.open("POST", "/api/dosyalar");
-    $("#ds-sayi").textContent = `Yükleniyor: ${dosya.name}…`;
-    xhr.upload.onprogress = (e) => { if (e.lengthComputable) $("#ds-sayi").textContent = `Yükleniyor: ${dosya.name} (%${Math.round(100 * e.loaded / e.total)})`; };
-    xhr.onload = () => {
-      $("#ds-dosya").value = "";
-      let v = {}; try { v = JSON.parse(xhr.responseText); } catch (e) { /* boş */ }
-      if (xhr.status === 401) { location.href = "/giris"; return; }
-      if (xhr.status >= 200 && xhr.status < 300) { bildir(v.yeni ? `${v.dosya.ad} kütüphaneye eklendi` : `${v.dosya.ad} zaten kütüphanede (aynı içerik)`, 5000); dsSecili = v.dosya.id; dosyaSistemiAc(); }
-      else { bildir(`Yükleme başarısız — ${v.hata || xhr.statusText}`, 8000); dsTablo(); }
-    };
-    xhr.onerror = () => { $("#ds-dosya").value = ""; bildir("Yükleme sırasında ağ hatası", 8000); dsTablo(); };
-    xhr.send(fd);
+  // ---------- kütüphaneye dosya ekleme paneli ----------
+  const UZANTILAR = /\.(gcode|gco|g|gcode\.gz|gz|3mf)$/i;
+  let deListe = [];          // {dosya, aciklama, onizleme, durum, mesaj}
+  let deYukleniyor = false;
+  function dosyaEkleAc() {
+    deListe = []; deYukleniyor = false; $("#ds-dosya").value = ""; $("#de-durum").textContent = ""; $("#de-ilerleme").hidden = true; $("#de-aktif").checked = true;
+    deCiz(); ac("ortu-dosya-ekle");
+  }
+  $("#ds-ekle-btn").addEventListener("click", dosyaEkleAc);
+  function deCiz() {
+    $("#secilen-dosyalar").innerHTML = deListe.map((k, i) => `<div class="sd ${k.durum || ""}" data-i="${i}">
+      ${k.onizleme ? `<img class="ds-resim" src="${k.onizleme}" alt="">` : '<span class="ds-resim-yok">önizleme yok</span>'}
+      <div><div class="sd-ad">${kacis(k.dosya.name)}</div><div class="sd-bilgi">${boyutMetin(k.dosya.size)}${k.tahmini ? " · tahmini " + kacis(k.tahmini) : ""}</div>
+        ${k.durum === "tamam" ? `<div class="sd-sonuc sonuc-tamamlandi">${kacis(k.mesaj)}</div>` : k.durum === "hatali" ? `<div class="sd-sonuc sonuc-hata">${kacis(k.mesaj)}</div>` :
+        `<input type="text" class="sd-aciklama" placeholder="Açıklama (isteğe bağlı): parça, malzeme, katman…" value="${kacis(k.aciklama)}" maxlength="500" ${deYukleniyor ? "disabled" : ""}>`}</div>
+      ${deYukleniyor || k.durum === "tamam" ? "<span></span>" : `<button type="button" class="sd-kaldir" title="Listeden çıkar" aria-label="Listeden çıkar">×</button>`}
+    </div>`).join("");
+    const bekleyen = deListe.filter(k => k.durum !== "tamam").length;
+    $("#de-yukle").disabled = deYukleniyor || !bekleyen;
+    $("#de-yukle").textContent = bekleyen > 1 ? `${bekleyen} Dosyayı Kütüphaneye Yükle` : "Kütüphaneye Yükle";
+  }
+  function onizlemeCikar(dosya) {
+    // G-code başındaki "; thumbnail begin WxH N … ; thumbnail end" bloğundan en büyük PNG'yi alır (sunucu da aynı işi yapar)
+    return new Promise((coz) => {
+      if (!/\.(gcode|gco|g)$/i.test(dosya.name)) { coz({}); return; }
+      const okuyucu = new FileReader();
+      okuyucu.onerror = () => coz({});
+      okuyucu.onload = () => {
+        const metin = String(okuyucu.result || ""); let enIyi = null, enAlan = -1;
+        const re = /;\s*thumbnail begin (\d+)x(\d+) \d+\s*\n([\s\S]*?);\s*thumbnail end/gi; let m;
+        while ((m = re.exec(metin))) { const alan = m[1] * m[2]; if (alan > enAlan) { enAlan = alan; enIyi = m[3]; } }
+        const sonuc = {};
+        if (enIyi) sonuc.onizleme = "data:image/png;base64," + enIyi.split("\n").map(l => l.replace(/^\s*;?\s*/, "").trim()).join("");
+        const z = /;\s*(?:estimated printing time[^=:]*|TIME)\s*[:=]\s*([^\n]+)/i.exec(metin); if (z) sonuc.tahmini = z[1].trim();
+        coz(sonuc);
+      };
+      okuyucu.readAsText(dosya.slice(0, 2 * 1024 * 1024));
+    });
+  }
+  async function deDosyalarEkle(dosyalar) {
+    for (const d of Array.from(dosyalar || [])) {
+      if (!UZANTILAR.test(d.name)) { bildir(`${d.name}: yalnız G-code / 3MF dosyaları eklenebilir`, 5000); continue; }
+      if (deListe.some(k => k.dosya.name === d.name && k.dosya.size === d.size)) continue;
+      const kayit = { dosya: d, aciklama: "", durum: "" }; deListe.push(kayit); deCiz();
+      Object.assign(kayit, await onizlemeCikar(d)); deCiz();
+    }
+  }
+  $("#ds-dosya").addEventListener("change", () => { deDosyalarEkle($("#ds-dosya").files); $("#ds-dosya").value = ""; });
+  const alan = $("#birakma-alani");
+  ["dragenter", "dragover"].forEach(t => alan.addEventListener(t, (e) => { e.preventDefault(); alan.classList.add("surukleniyor"); }));
+  ["dragleave", "drop"].forEach(t => alan.addEventListener(t, (e) => { e.preventDefault(); alan.classList.remove("surukleniyor"); }));
+  alan.addEventListener("drop", (e) => deDosyalarEkle(e.dataTransfer.files));
+  $("#secilen-dosyalar").addEventListener("input", (e) => { const g = e.target.closest(".sd-aciklama"); if (g) deListe[Number(g.closest(".sd").dataset.i)].aciklama = g.value; });
+  $("#secilen-dosyalar").addEventListener("click", (e) => { const b = e.target.closest(".sd-kaldir"); if (!b || deYukleniyor) return; deListe.splice(Number(b.closest(".sd").dataset.i), 1); deCiz(); });
+  function deTekYukle(k, toplamYuzde) {
+    return new Promise((coz) => {
+      const fd = new FormData(); fd.append("file", k.dosya, k.dosya.name); fd.append("aciklama", k.aciklama.trim());
+      const xhr = new XMLHttpRequest(); xhr.open("POST", "/api/dosyalar");
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable) toplamYuzde(e.loaded / e.total); };
+      xhr.onload = () => {
+        let v = {}; try { v = JSON.parse(xhr.responseText); } catch (err) { /* boş */ }
+        if (xhr.status === 401) { location.href = "/giris"; return; }
+        if (xhr.status >= 200 && xhr.status < 300) { k.durum = "tamam"; k.mesaj = v.yeni ? "Kütüphaneye eklendi" : `Aynı içerik zaten kütüphanede: ${v.dosya.ad}`; k.sonuc = v.dosya; }
+        else { k.durum = "hatali"; k.mesaj = "Yüklenemedi: " + (v.hata || xhr.statusText); }
+        coz();
+      };
+      xhr.onerror = () => { k.durum = "hatali"; k.mesaj = "Ağ hatası"; coz(); };
+      xhr.send(fd);
+    });
+  }
+  $("#dosya-ekle-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); if (deYukleniyor) return;
+    const bekleyen = deListe.filter(k => k.durum !== "tamam"); if (!bekleyen.length) return;
+    deYukleniyor = true; deCiz(); const cubuk = $("#de-ilerleme"); cubuk.hidden = false; cubuk.value = 0;
+    const toplam = bekleyen.reduce((t, k) => t + k.dosya.size, 0); let biten = 0;
+    for (let i = 0; i < bekleyen.length; i++) {
+      const k = bekleyen[i]; k.durum = ""; $("#de-durum").textContent = `Yükleniyor ${i + 1}/${bekleyen.length}: ${k.dosya.name}`;
+      await deTekYukle(k, (oran) => { cubuk.value = Math.round(100 * (biten + oran * k.dosya.size) / Math.max(1, toplam)); });
+      biten += k.dosya.size; cubuk.value = Math.round(100 * biten / Math.max(1, toplam));
+      if (k.durum === "tamam" && k.sonuc && !$("#de-aktif").checked) { try { await put(`/api/dosyalar/${k.sonuc.id}`, { durum: "pasif" }); } catch (err) { /* liste yenilenince görülür */ } }
+    }
+    deYukleniyor = false; deCiz();
+    const basarili = bekleyen.filter(k => k.durum === "tamam").length, hatali = bekleyen.length - basarili;
+    $("#de-durum").textContent = hatali ? `${basarili} dosya yüklendi, ${hatali} dosya yüklenemedi` : `${basarili} dosya yüklendi`;
+    if (basarili) { const son = bekleyen.find(k => k.durum === "tamam"); dsSecili = son && son.sonuc ? son.sonuc.id : dsSecili; dosyaSistemiAc(); }
+    if (!hatali) { setTimeout(() => { if (!deYukleniyor) kapat("ortu-dosya-ekle"); }, 900); bildir(basarili > 1 ? `${basarili} dosya kütüphaneye eklendi` : `${bekleyen[0].dosya.name} kütüphaneye eklendi`, 5000); }
   });
 
   // ---------- yazıcı adı: gözetmen dahil herkes değiştirebilir ----------
-  $("#ay-ad-duzenle").addEventListener("click", async () => {
+  function ayAdFormAc() {
     const y = st.yazicilar.get(st.acikYazici); if (!y) return;
-    const ad = prompt("Yazıcının yeni adı:", y.ad); if (ad === null) return;
-    const temiz = ad.trim(); if (!temiz || temiz === y.ad) return;
-    try { await put(`/api/yazicilar/${y.id}/ad`, { ad: temiz }); bildir(`Yazıcı adı "${temiz}" olarak değiştirildi`); }
+    const f = $("#ay-ad-form"); f.ad.value = y.ad; $("#ay-baslik").hidden = true; f.hidden = false; f.ad.focus(); f.ad.select();
+  }
+  function ayAdFormKapat() { $("#ay-ad-form").hidden = true; $("#ay-baslik").hidden = false; }
+  $("#ay-ad-duzenle").addEventListener("click", ayAdFormAc);
+  $("#ay-ad-vazgec").addEventListener("click", ayAdFormKapat);
+  $("#ay-ad-form").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); ayAdFormKapat(); } });
+  $("#ay-ad-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const y = st.yazicilar.get(st.acikYazici); if (!y) return;
+    const temiz = e.target.ad.value.trim(); if (!temiz || temiz === y.ad) { ayAdFormKapat(); return; }
+    try { await put(`/api/yazicilar/${y.id}/ad`, { ad: temiz }); ayAdFormKapat(); bildir(`Yazıcı adı "${temiz}" olarak değiştirildi`); }
     catch (err) { bildir(err.message, 6000); }
   });
   $$(".uyg[data-modul]").forEach(b => b.addEventListener("click", () => modulAc(b.dataset.modul)));

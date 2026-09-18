@@ -92,8 +92,7 @@
       <select id="ds-filtre"><option value="">Aktif + pasif</option><option value="aktif">Yalnız aktif</option><option value="pasif">Yalnız pasif</option></select>
       <span class="bosluk"></span>
       <span class="ipucu" id="ds-sayi"></span>
-      <label class="btn btn-birincil" for="ds-dosya" data-rol="yazici_yoneticisi">+ Dosya Ekle</label>
-      <input type="file" id="ds-dosya" accept=".gcode,.gz,.gco,.g,.3mf" hidden>
+      <button class="btn btn-birincil" id="ds-ekle-btn" data-rol="yazici_yoneticisi">+ Dosya Ekle</button>
     </div>
     <div class="panel ds-panel">
       <div class="tablo-kaydir ds-kaydir">
@@ -222,7 +221,11 @@
     <header class="tam-ust">
       <div class="ay-kimlik">
         <span class="ay-ikon" id="ay-ikon"></span>
-        <div><h2 id="ay-baslik">Yazıcı <button type="button" class="kalem" id="ay-ad-duzenle" title="Yazıcı adını değiştir" aria-label="Yazıcı adını değiştir">✎</button></h2><small class="ipucu" id="ay-altbaslik"></small></div>
+        <div>
+          <h2 id="ay-baslik">Yazıcı <button type="button" class="kalem" id="ay-ad-duzenle" title="Yazıcı adını değiştir" aria-label="Yazıcı adını değiştir">✎</button></h2>
+          <form class="ay-ad-form" id="ay-ad-form" hidden><input name="ad" maxlength="64" required autocomplete="off"><button class="btn btn-birincil" type="submit">Kaydet</button><button class="btn" type="button" id="ay-ad-vazgec">Vazgeç</button></form>
+          <small class="ipucu" id="ay-altbaslik"></small>
+        </div>
       </div>
       <div class="tam-ust-sag">
         <button class="ikon-btn" id="ay-menu-btn" title="Modüller" aria-haspopup="true">
@@ -420,6 +423,30 @@
       <thead><tr><th>Zaman</th><th>Kullanıcı</th><th>İşlem</th><th>Hedef</th><th>Ayrıntı</th><th>IP</th></tr></thead>
       <tbody></tbody>
     </table>
+  </div>
+</div>
+
+<!-- Kütüphaneye dosya ekleme paneli -->
+<div class="ortu" id="ortu-dosya-ekle" hidden>
+  <div class="modal genis dosya-ekle">
+    <div class="modal-baslik"><div><h2>Kütüphaneye Dosya Ekle</h2><small class="ipucu">G-code (.gcode, .gco, .g, .gcode.gz) ya da 3MF; en fazla 1 GB. Yüklenen dosya yazdırılmaz, yalnız kütüphaneye kaydedilir.</small></div><button class="btn btn-ikincil" data-kapat="ortu-dosya-ekle">Kapat</button></div>
+    <form id="dosya-ekle-form" class="form">
+      <label class="birakma-alani" id="birakma-alani" for="ds-dosya">
+        <input type="file" id="ds-dosya" accept=".gcode,.gz,.gco,.g,.3mf" multiple hidden>
+        <span class="ba-ikon">📄</span>
+        <b>Dosyaları buraya sürükleyin</b>
+        <span class="ipucu">ya da seçmek için tıklayın · birden çok dosya seçilebilir</span>
+      </label>
+      <div class="secilen-dosyalar" id="secilen-dosyalar"></div>
+      <div class="satir dosya-ekle-alt">
+        <label class="satir-kutu"><input type="checkbox" id="de-aktif" checked> Yüklenince <b>Aktif</b> olsun (yazıcılara gönderilebilir)</label>
+        <span class="bosluk"></span>
+        <span class="ipucu" id="de-durum"></span>
+        <button class="btn" type="button" data-kapat="ortu-dosya-ekle">Vazgeç</button>
+        <button class="btn btn-birincil" type="submit" id="de-yukle" disabled>Kütüphaneye Yükle</button>
+      </div>
+      <progress id="de-ilerleme" max="100" value="0" hidden></progress>
+    </form>
   </div>
 </div>
 
