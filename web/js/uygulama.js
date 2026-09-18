@@ -622,12 +622,12 @@
   });
   $("#ay-sil").addEventListener("click", async () => {
     const id = Number($("#ay-form").dataset.id), y = st.yazicilar.get(id);
-    if (!y || !confirm(`${y.ad} (${y.ip}) silinsin mi?`)) return;
+    if (!y || !(await onayla(`${y.ad} (${y.ip}) sistemden silinsin mi?\n\nYazıcının olay ve telemetri kayıtları silinmez.`, { baslik: "Yazıcıyı Sil", dugme: "Sil", tehlike: true }))) return;
     try { await del(`/api/yazicilar/${id}`); kapat("ortu-ayrinti"); } catch (err) { bildir(err.message); }
   });
   $$("#ortu-ayrinti [data-komut]").forEach(b => b.addEventListener("click", async () => {
     const id = st.acikYazici, komut = b.dataset.komut;
-    if (komut === "durdur" && !confirm("Baskı iptal edilsin mi? Bu işlem geri alınamaz.")) return;
+    if (komut === "durdur" && !(await onayla("Süren baskı iptal edilecek. Bu işlem geri alınamaz.", { baslik: "Baskıyı İptal Et", dugme: "İptal Et", tehlike: true }))) return;
     try {
       const v = await post(`/api/yazicilar/${id}/komut`, { komut, deger: b.dataset.deger != null ? Number(b.dataset.deger) : null });
       bildir(v.gonderildi ? "Komut gönderildi" : "Gönderilemedi: yazıcı bağlı değil");
@@ -808,14 +808,21 @@
         if (!ben) { govde.rol = $(".rol", tr).value; govde.etkin = $(".etkin", tr).checked; }
         await put(`/api/kullanicilar/${id}`, govde); bildir("Kaydedildi");
       } else if (b.dataset.eylem === "parola") {
-        const p = prompt("Bu kullanıcı için yeni parola (en az 8 karakter):"); if (!p) return;
-        await put(`/api/kullanicilar/${id}`, { parola: p }); bildir("Parola değiştirildi; kullanıcının oturumları kapatıldı");
+        const f = $("#kparola-form"); f.reset(); f.dataset.id = id;
+        $("#kparola-alt").textContent = `${$(".ad", tr).value || $("td", tr).textContent.trim()} (${$("td", tr).textContent.trim().replace(/\s*\(siz\)$/, "")})`;
+        ac("ortu-kparola"); f.yeni.focus(); return;
       } else if (b.dataset.eylem === "sil") {
-        if (!confirm(`${$("td", tr).textContent.trim()} silinsin mi?`)) return;
+        if (!(await onayla(`${$("td", tr).textContent.trim()} kullanıcısı silinsin mi?\n\nİşlem geçmişi kayıtları kalır.`, { baslik: "Kullanıcıyı Sil", dugme: "Sil", tehlike: true }))) return;
         await del(`/api/kullanicilar/${id}`); bildir("Silindi");
       }
       kullaniciTablo((await api("/api/kullanicilar")).kullanicilar);
     } catch (err) { bildir(err.message, 6000); }
+  });
+  $("#kparola-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); const f = e.target, id = Number(f.dataset.id);
+    if (f.yeni.value !== f.yeni2.value) { bildir("Parolalar eşleşmiyor"); f.yeni2.focus(); return; }
+    try { await put(`/api/kullanicilar/${id}`, { parola: f.yeni.value }); kapat("ortu-kparola"); bildir("Parola değiştirildi; kullanıcının oturumları kapatıldı", 5000); }
+    catch (err) { bildir(err.message, 6000); }
   });
   $("#yeni-kullanici").addEventListener("submit", async (e) => {
     e.preventDefault(); const f = e.target;
@@ -880,7 +887,7 @@
     const b = e.target.closest("button[data-eylem]"); if (!b) return;
     const tr = b.closest("tr"), kod = tr.dataset.kod;
     try {
-      if (b.dataset.eylem === "sil") { if (!confirm(`${kod} kodu tablodan silinsin mi?`)) return; const v = await del(`/api/hata_kodlari/${kod}`); hkBilgi(v.bilgi); bildir("Silindi"); }
+      if (b.dataset.eylem === "sil") { if (!(await onayla(`${kod} kodu hata tablosundan silinsin mi?`, { baslik: "Hata Kodunu Sil", dugme: "Sil", tehlike: true }))) return; const v = await del(`/api/hata_kodlari/${kod}`); hkBilgi(v.bilgi); bildir("Silindi"); }
       else { const g = {}; tr.querySelectorAll("input,textarea").forEach(i => g[i.name] = i.value); const v = await put(`/api/hata_kodlari/${kod}`, g); hkBilgi(v.bilgi); bildir(`${v.kayit.tam_kod} kaydedildi`); }
       hkListe = (await api("/api/hata_kodlari")).liste; hkTablo();
     } catch (err) { bildir(err.message, 6000); }
@@ -909,8 +916,19 @@
   yenilemeKur(1);
 
   // ---------- genel ----------
+  let onayCozucu = null;
+  function onayla(metin, secenek) {
+    const o = secenek || {};
+    $("#onay-baslik").textContent = o.baslik || "Onay"; $("#onay-metin").textContent = metin;
+    const evet = $("#onay-evet"); evet.textContent = o.dugme || "Evet"; evet.className = "btn " + (o.tehlike ? "btn-tehlike" : "btn-birincil");
+    if (onayCozucu) onayCozucu(false);
+    return new Promise((coz) => { onayCozucu = coz; ac("ortu-onay"); evet.focus(); });
+  }
+  function onayBitir(sonuc) { const c = onayCozucu; onayCozucu = null; $("#ortu-onay").hidden = true; if (c) c(sonuc); }
+  $("#onay-evet").addEventListener("click", () => onayBitir(true));
+  $("#onay-hayir").addEventListener("click", () => onayBitir(false));
   function ac(id) { $("#" + id).hidden = false; }
-  function kapat(id) { if (id === "ortu-dosya-ekle" && deYukleniyor) { bildir("Yükleme sürüyor, lütfen bekleyin"); return; } $("#" + id).hidden = true; if (id === "ortu-ayrinti") { st.acikYazici = null; st.ayHata = null; $("#ay-form").dataset.id = ""; ayMenuKapat(); ayAdFormKapat(); } }
+  function kapat(id) { if (id === "ortu-dosya-ekle" && deYukleniyor) { bildir("Yükleme sürüyor, lütfen bekleyin"); return; } if (id === "ortu-onay") { onayBitir(false); return; } $("#" + id).hidden = true; if (id === "ortu-ayrinti") { st.acikYazici = null; st.ayHata = null; $("#ay-form").dataset.id = ""; ayMenuKapat(); ayAdFormKapat(); } }
   $$("[data-kapat]").forEach(b => b.addEventListener("click", () => kapat(b.dataset.kapat)));
   $$(".ortu").forEach(o => o.addEventListener("click", (e) => { if (e.target === o) kapat(o.id); }));
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") $$(".ortu").forEach(o => { if (!o.hidden) kapat(o.id); }); });
@@ -987,7 +1005,7 @@
     seciciSecim = Number(tr.dataset.id); seciciSecimUygula();
   });
   $("#secici-tablo").addEventListener("dblclick", (e) => { const tr = e.target.closest("tr[data-id]"); if (tr && !tr.classList.contains("pasif")) { seciciSecim = Number(tr.dataset.id); seciciSecimUygula(); $("#secici-onay").click(); } });
-  $("#secici-onay").addEventListener("click", () => {
+  $("#secici-onay").addEventListener("click", async () => {
     if (seciciSecim == null) return;
     const dosyaId = seciciTur === "dosya" ? seciciSecim : seciciHedef, yaziciId = seciciTur === "dosya" ? seciciHedef : seciciSecim;
     const y = st.yazicilar.get(yaziciId), d = seciciTur === "dosya" ? seciciListe.find(x => x.id === dosyaId) : dsListe.find(x => x.id === dosyaId);
@@ -995,7 +1013,7 @@
     const c = y.canli || {}, mesaj = (c.durum === "basiyor" || c.durum === "duraklatildi")
       ? `DİKKAT: ${y.ad} şu an "${c.dosya}" basıyor (%${Math.round(c.ilerleme || 0)}).\n\nBu işlem mevcut işlemi durduracak ve "${d.ad}" dosyasını yazdırmaya başlayacak.\n\nDevam edilsin mi?`
       : `${y.ad} yazıcısına "${d.ad}" yüklenip yazdırılacak.\n\nBu işlem mevcut işlemi durduracak. Devam edilsin mi?`;
-    if (!confirm(mesaj)) return;
+    if (!(await onayla(mesaj, { baslik: "Yazıcıya Gönder ve Yazdır", dugme: "Gönder ve Yazdır", tehlike: c.durum === "basiyor" || c.durum === "duraklatildi" }))) return;
     kapat("ortu-secici");
     dosyaGonder(dosyaId, yaziciId, d.ad);
   });
@@ -1040,7 +1058,7 @@
         if (b.dataset.eylem === "durum") { await put(`/api/dosyalar/${id}`, { durum: d.durum === "aktif" ? "pasif" : "aktif" }); bildir(d.durum === "aktif" ? `${d.ad} pasife alındı` : `${d.ad} aktif edildi`); }
         else if (b.dataset.eylem === "gonder") yaziciSeciciAc(d);
         else if (b.dataset.eylem === "indir") { if (d.var) location.href = b.href; }
-        else if (b.dataset.eylem === "sil") { if (!confirm(`"${d.ad}" kütüphaneden silinsin mi?\n\nYükleme ve baskı kayıtları kalır, dosya diskten silinir.`)) return; await del(`/api/dosyalar/${id}`); bildir("Silindi"); if (dsSecili === id) { dsSecili = null; $("#ds-alt").hidden = true; } }
+        else if (b.dataset.eylem === "sil") { if (!(await onayla(`"${d.ad}" kütüphaneden silinsin mi?\n\nYükleme ve baskı kayıtları kalır, dosya diskten silinir.`, { baslik: "Dosyayı Sil", dugme: "Sil", tehlike: true }))) return; await del(`/api/dosyalar/${id}`); bildir("Silindi"); if (dsSecili === id) { dsSecili = null; $("#ds-alt").hidden = true; } }
       } catch (err) { bildir(err.message, 6000); }
       return;
     }

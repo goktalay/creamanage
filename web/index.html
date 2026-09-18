@@ -463,6 +463,28 @@
   </div>
 </div>
 
+<!-- Kullanıcı parolası belirle (sistem yöneticisi) -->
+<div class="ortu" id="ortu-kparola" hidden>
+  <div class="modal">
+    <div class="modal-baslik"><div><h2>Parola Belirle</h2><small class="ipucu" id="kparola-alt"></small></div><button class="btn btn-ikincil" data-kapat="ortu-kparola">Kapat</button></div>
+    <form class="form" id="kparola-form">
+      <label>Yeni parola <input name="yeni" type="password" autocomplete="new-password" required minlength="8" placeholder="en az 8 karakter"></label>
+      <label>Yeni parola (tekrar) <input name="yeni2" type="password" autocomplete="new-password" required minlength="8"></label>
+      <p class="ipucu">Parola değişince kullanıcının açık oturumları kapatılır; yeni parolayla tekrar giriş yapması gerekir.</p>
+      <div class="satir sag"><button class="btn" type="button" data-kapat="ortu-kparola">Vazgeç</button><button class="btn btn-birincil" type="submit">Parolayı Kaydet</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Onay penceresi (confirm yerine) -->
+<div class="ortu" id="ortu-onay" hidden>
+  <div class="modal onay">
+    <div class="modal-baslik"><h2 id="onay-baslik">Onay</h2></div>
+    <p id="onay-metin"></p>
+    <div class="satir sag"><button class="btn" type="button" id="onay-hayir">Vazgeç</button><button class="btn btn-birincil" type="button" id="onay-evet">Evet</button></div>
+  </div>
+</div>
+
 <!-- Parola değiştir -->
 <div class="ortu" id="ortu-parola" hidden>
   <div class="modal">
