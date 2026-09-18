@@ -6,7 +6,28 @@ Creality **K2 Plus (Combo)** 3D yazıcı filosunu (hedef: 56 cihaz) yerel ağ ü
 Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sunduğu
 **WebSocket 9999** arayüzü kullanılır (root, Moonraker, bulut yok). Garanti korunur.
 
-## Sürüm 0.8.0 — ne yapar
+## Sürüm 0.9.0 — ne yapar
+
+- **Dosya Sistemi (kütüphane; herkes görür):** yüklenen G-code/3MF dosyaları sunucuda
+  saklanır (`<veritabanı>_dosyalar/`, `CREAMANAGE_DOSYALAR`). Tablo: Durumu (Aktif/Pasif),
+  Yükleme Zamanı, Yükleyen Kullanıcı, Dosya Adı, Dosya Açıklaması, Dosya Boyutu, Dosya
+  Resmi (dilimleyicinin gömdüğü önizleme: G-code `; thumbnail begin` blokları, `.gcode.gz`,
+  3MF `Metadata/*.png`). Aynı içerik (SHA-256) ikinci kez eklenirse yeni kayıt açılmaz.
+  Yazıcı yöneticisi dosya ekler, açıklama yazar, aktif/pasif yapar, "Yazıcıya Gönder" ile
+  yazıcı seçip yükler ve yazdırır; silme yalnız sistem yöneticisi. Bir satır seçilince
+  altında **Yüklemeler** (Yükleyen, Yükleme Zamanı, Yüklenen Yazıcı, sonuç) ve sağında
+  **Baskılar** (Yazıcı, Başlatma Zamanı, Bitirme Zamanı, Hata Durumu, Toplam Baskı Süresi)
+  listelenir; bir yükleme seçilince yalnız ona ait baskılar kalır. Zincir: Dosya → Yükleme →
+  Baskı (başlatma/bitirme) yazıcı telemetrisinden otomatik izlenir (tamamlandı / hata /
+  iptal / sürüyor).
+- **Dosya seçimi kütüphaneden:** Dosya Yöneticisi kartları ve ayrıntıdaki "Dosya Seç ve
+  Yazdır" artık bilgisayardan dosya istemez; Dosya Sistemi'ndeki **aktif** dosyaları listeler,
+  "mevcut işlemi durduracak" onayından sonra gönderir.
+- **Renkler:** Basıyor mavi, Tamamlandı yeşil (bağlantı/iyi durumlar ayrı yeşil).
+- **Yazıcı adı:** gözetmen dahil herkes ayrıntı başlığındaki kalem (✎) ile yazıcının adını
+  değiştirebilir (`PUT /api/yazicilar/{id}/ad`); işlem geçmişine yazılır.
+
+## Sürüm 0.8.0
 
 - **Kullanıcı girişi ve roller:** herkes kullanıcı adı ve parola ile girer. Üç rol:
   **Sistem Yöneticisi** (her şey: yazıcı ekleme/silme/ayarları, ağ tarama, kullanıcılar,
@@ -19,7 +40,7 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
   başlat/iptal, bildirim ayarı ve testi, kullanıcı işlemleri, parola değişikliği; zaman ve
   IP ile. Sistem yöneticisi kullanıcı başına ya da tümünü görüntüler.
 - **Dosya yükleme ve yazdırma ("Yükle" görünümü):** her yazıcı bir kart; ortadaki büyük
-  dosya adına tıklayınca G-code seçilir, "mevcut işlemi durduracak" uyarısı onaylanınca dosya
+  dosya adına tıklayınca kütüphaneden dosya seçilir (0.9.0), "mevcut işlemi durduracak" uyarısı onaylanınca dosya
   yazıcıya HTTP ile yüklenir ve baskı başlatılır. İlerleme kartta görünür. Gözetmen yalnız
   dosya adını görür.
 - **Ağ tarama sihirbazı:** makinedeki alt ağları listeler, seçilen CIDR'da 9999 portunu
@@ -140,7 +161,7 @@ kullanılmazsa düşer), tarayıcıya yalnız HttpOnly çerez verilir. 5 başar�
 60 sn kilit. Ağ dışından erişim açılacaksa HTTPS (ters vekil) önerilir.
 
 Ortam değişkenleri: `CREAMANAGE_HOST`, `CREAMANAGE_PORT`, `CREAMANAGE_VERITABANI`,
-`CREAMANAGE_TELEMETRI`, `CREAMANAGE_TELEMETRI_GUN`, `CREAMANAGE_HATA_KODLARI`, `CREAMANAGE_LOG`. Komut satırı: `--host`, `--port`, `--veritabani`, `--log`.
+`CREAMANAGE_TELEMETRI`, `CREAMANAGE_TELEMETRI_GUN`, `CREAMANAGE_DOSYALAR`, `CREAMANAGE_HATA_KODLARI`, `CREAMANAGE_LOG`. Komut satırı: `--host`, `--port`, `--veritabani`, `--telemetri`, `--telemetri-gun`, `--dosyalar`, `--log`.
 
 Sunucu, yazıcılarla **aynı yerel ağda** (ya da 9999 portuna yönlendirilmiş bir ağda)
 olmalıdır. Tarama için alt ağ en fazla /20 (4096 adres) olabilir.
@@ -181,7 +202,7 @@ Simülatör telemetri, kalp atışı ve `pause/stop/lightSw` komutlarını takli
 
 ```bash
 cd testler
-python3 -m unittest -v test_kamera test_telemetri test_mudahale test_yukleme test_kullanicilar test_k2_protokol test_filo_uctan_uca test_telegram
+python3 -m unittest -v test_dosyalar test_kamera test_telemetri test_mudahale test_yukleme test_kullanicilar test_k2_protokol test_filo_uctan_uca test_telegram
 ```
 
 Telegram testleri sahte bir Telegram API sunucusuyla çalışır, internet gerekmez.
@@ -200,12 +221,13 @@ creamanage/
   k2_protokol.py   saf protokol: mesaj üretimi, çözümleme, durum türetme, özet  (G/Ç yok)
   k2_baglanti.py   yazıcı başına kalıcı WebSocket istemcisi, kalp atışı, yeniden bağlanma
   tarayici.py      alt ağ listesi, paralel port yoklama, kimlik sorgusu, Tarama işi
-  veritabani.py    SQLite: yazicilar, olaylar
+  veritabani.py    SQLite: yazicilar, olaylar, kullanicilar, denetim, dosyalar, dosya_yuklemeleri, baskilar
   olaylar.py       durum geçişi → olay; abone modeli (uyarı kanalları buraya takılır)
   filo.py          kayıt + bağlantı + tarama + olay orkestrasyonu, arayüz yayını (≤1/s/yazıcı)
   kullanicilar.py  roller, parola hash'i, oturumlar, giriş kilidi
   web.py           aiohttp: kimlik/rol ara katmanı, statik arayüz, REST API, /ws yayını
   yukleme.py       HTTP dosya yükleme (/upload), /info model sorgusu, güvenli dosya adı
+  dosyalar.py      dosya kütüphanesi: saklama, SHA-256 tekilleştirme, önizleme (thumbnail) çıkarma
   telemetri_kayit.py  yazıcı başına SQLite: 1 sn örnekleme, değişim günlüğü, saklama
   hata_kodlari.py  Creality hata kodu tablosu (veri/hata_kodlari.json) → anlamlı metin
   telegram.py      Telegram bildirim kanalı (OlayMerkezi abonesi, toplu gönderim, 429 uyumu)
@@ -231,7 +253,13 @@ testler/           birim ve uçtan uca testler
 | `GET /api/yazicilar/{id}/degisimler`, `GET /api/yazicilar/{id}/hatalar` | değişim ve hata geçmişi |
 | `GET /api/hata_kodlari`, `PUT/DELETE /api/hata_kodlari/{kod}`, `POST /api/hata_kodlari/ice_aktar` | hata kodu tablosu (yazma: sistem yöneticisi) |
 | `GET /api/yazicilar/{id}/kamera`, `POST /api/yazicilar/{id}/kamera/kayit` | sunucu taraflı kare (kamera_url) / tarayıcı WebRTC işlem kaydı |
-| `POST /api/yazicilar/{id}/dosya` | multipart `file` (+`baslat`=1/0): yükle ve yazdır (yazıcı yöneticisi) |
+| `POST /api/yazicilar/{id}/dosya` | multipart `file` (+`baslat`=1/0): kütüphaneye ekle, yükle ve yazdır (yazıcı yöneticisi) |
+| `PUT /api/yazicilar/{id}/ad` | `{ad}` yalnız ad değişikliği (gözetmen dahil herkes) |
+| `GET /api/dosyalar?durum=aktif\|pasif`, `POST /api/dosyalar` | kütüphane listesi (herkes) / multipart `file` + `aciklama` ile ekleme (yazıcı yöneticisi) |
+| `GET/PUT/DELETE /api/dosyalar/{id}` | ayrıntı (+yüklemeler, +baskılar) / `{aciklama?, durum?}` / sil (sistem yöneticisi) |
+| `GET /api/dosyalar/{id}/resim`, `GET /api/dosyalar/{id}/indir` | önizleme PNG / dosyayı indir |
+| `POST /api/dosyalar/{id}/gonder` | `{yazici_id, baslat?}` kütüphanedeki aktif dosyayı yazıcıya yükle ve yazdır |
+| `GET /api/yazicilar/{id}/baskilar` | yazıcının baskı ve yükleme kayıtları |
 | `POST /api/yazicilar/{id}/komut` | `{komut: duraklat\|surdur\|durdur\|isik\|nozul\|tabla\|fan, deger?}` |
 | `GET /api/aglar` | makinedeki alt ağlar |
 | `POST /api/tarama`, `GET /api/tarama`, `POST /api/tarama/iptal` | tarama işi |
@@ -239,7 +267,7 @@ testler/           birim ve uçtan uca testler
 | `GET/PUT /api/ayarlar/telegram` | bildirim ayarları (belirteç maskelenir; boş belirteç mevcut olanı korur) |
 | `POST /api/ayarlar/telegram/test` | test mesajı `{token?, sohbetler?}` |
 | `POST /api/ayarlar/telegram/sohbetler` | bota yazan sohbetleri listeler `{token?}` |
-| `WS /ws` | `anlik`, `yazici`, `yazici_silindi`, `olay`, `tarama` mesajları |
+| `WS /ws` | `anlik`, `yazici`, `yazici_silindi`, `olay`, `tarama`, `dosyalar` mesajları |
 
 ## K2 yerel protokolü (topluluk gözlemi)
 

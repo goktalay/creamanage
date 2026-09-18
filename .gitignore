@@ -5,6 +5,7 @@ creamanage.sqlite-wal
 creamanage.sqlite-shm
 creamanage_telemetri/
 *_telemetri/
+*_dosyalar/
 *.log
 # python
 __pycache__/

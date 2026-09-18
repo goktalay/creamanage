@@ -23,9 +23,10 @@ Yayinci = Callable[[dict], Awaitable[None] | None]
 
 
 class Filo:
-    def __init__(self, vt: Veritabani, telemetri=None) -> None:
+    def __init__(self, vt: Veritabani, telemetri=None, kutuphane=None) -> None:
         self.vt = vt
         self.telemetri = telemetri      # TelemetriKayit (isteğe bağlı)
+        self.kutuphane = kutuphane      # DosyaKutuphanesi (isteğe bağlı)
         self.olaylar = OlayMerkezi()
         self.baglantilar: dict[int, YaziciBaglantisi] = {}
         self.kayitlar: dict[int, dict] = {}
@@ -108,12 +109,57 @@ class Filo:
                 self.kayitlar[yid] = k
         for tur, mesaj, veri in gecis_olaylari(kayit["ad"], eski, yeni):
             await self._olay(tur, mesaj, yid, veri)
+        self._baski_izle(yid, kayit, eski, yeni)
         mudahale = self._dis_mudahale(yid, eski, yeni)
         if mudahale:
             await self._olay(O_DIS_MUDAHALE, f"{kayit['ad']}: {mudahale}", yid,
                              {"dosya": (eski or {}).get("dosya") or yeni.get("dosya") or "", "ilerleme": (eski or {}).get("ilerleme")})
         self._son_ozet[yid] = yeni
         self._yayin_planla(yid)
+
+    # --- baskı kayıtları (başlatma / bitirme sistemi) ---
+    def _baski_izle(self, yid: int, kayit: dict, eski: dict | None, yeni: dict) -> None:
+        """Durum geçişlerinden baskı kayıtlarını üretir: başlama, bitiş, sonuç, hata, süre."""
+        if not yeni.get("veri_var") or yeni.get("baglanti") != "bagli":
+            return
+        d, e_d = yeni.get("durum"), (eski or {}).get("durum")
+        acik = self.vt.acik_baski(yid)
+        dosya = yeni.get("dosya") or ""
+        if d in (P.D_BASIYOR, P.D_DURAKLATILDI):
+            if acik and acik["dosya_adi"] != dosya and dosya:
+                self.vt.baski_guncelle(acik["id"], bitis=time.time(), sonuc="bilinmiyor")
+                acik = None
+            if acik is None and d == P.D_BASIYOR:
+                yukleme = self.vt.son_yukleme(yid, dosya, time.time() - 7 * 86400) if dosya else None
+                dosya_id = yukleme["dosya_id"] if yukleme else None
+                if dosya_id is None and dosya:
+                    ayni = [x for x in self.vt.dosyalar() if x["ad"] == dosya]
+                    dosya_id = ayni[0]["id"] if ayni else None
+                gecen = yeni.get("gecen_sn") or 0
+                self.vt.baski_ekle(yid, kayit["ad"], dosya, yukleme["id"] if yukleme else None, dosya_id,
+                                   baslama=time.time() - (gecen if 0 < gecen < 30 * 86400 else 0))
+                acik = self.vt.acik_baski(yid)
+            if acik and yeni.get("hata_kodu") and not acik.get("hata_kodu"):
+                self.vt.baski_guncelle(acik["id"], hata_kodu=int(yeni["hata_kodu"]), hata_metni=str(yeni.get("hata_anahtari") or ""))
+            return
+        if acik is None:
+            return
+        if d == P.D_HATA:
+            self.vt.baski_guncelle(acik["id"], hata_kodu=int(yeni.get("hata_kodu") or 0), hata_metni=str(yeni.get("hata_anahtari") or ""))
+            return
+        if d in (P.D_TAMAMLANDI, P.D_BOSTA) or (d == P.D_HAZIRLANIYOR and e_d in (P.D_BOSTA, P.D_TAMAMLANDI)):
+            ilerleme = (eski or {}).get("ilerleme") if (eski or {}).get("ilerleme") is not None else yeni.get("ilerleme")
+            if d == P.D_TAMAMLANDI or (ilerleme is not None and ilerleme >= 100):
+                sonuc = "tamamlandi"
+            elif acik.get("hata_kodu") or (eski or {}).get("hata_kodu"):
+                sonuc = "hata"
+            elif e_d in (P.D_BASIYOR, P.D_DURAKLATILDI, P.D_HATA):
+                sonuc = "iptal"
+            else:
+                sonuc = "bilinmiyor"      # sunucu kapalıyken bitmiş
+            gecen = (eski or {}).get("gecen_sn") or yeni.get("gecen_sn")
+            toplam = int(gecen) if gecen else int(time.time() - acik["baslama"])
+            self.vt.baski_guncelle(acik["id"], bitis=time.time(), sonuc=sonuc, toplam_sn=toplam, ilerleme=ilerleme)
 
     def _sistem_komutu_var_mi(self, yid: int, *komutlar: str) -> bool:
         k = self.son_komut.get(yid)
@@ -241,9 +287,29 @@ class Filo:
                          + ("" if sonuc else " (başarısız: bağlı değil)"), yid, {"komut": ad, "deger": deger})
         return sonuc
 
-    # --- dosya yükleme ---
+    # --- dosya kütüphanesi → yazıcı ---
+    async def dosya_gonder(self, dosya_id: int, yid: int, baslat: bool = True, kullanici: dict | None = None) -> dict:
+        """Kütüphanedeki dosyayı yazıcıya yükler, yükleme kaydı açar, istenirse baskıyı başlatır."""
+        kayit = self.kayitlar.get(yid)
+        if kayit is None:
+            raise LookupError("yazıcı bulunamadı")
+        d = self.vt.dosya(dosya_id)
+        if d is None or not d.get("yol"):
+            raise LookupError("dosya bulunamadı")
+        if d.get("durum") != "aktif":
+            raise ValueError("pasif dosya yazıcıya gönderilemez")
+        k_id, k_ad = (kullanici or {}).get("id"), (kullanici or {}).get("kullanici_adi", "")
+        try:
+            sonuc = await self.dosya_yukle_ve_baslat(yid, d["ad"], d["yol"], baslat, k_ad, kaydet=False)
+        except Exception as e:  # noqa: BLE001
+            self.vt.yukleme_ekle(dosya_id, yid, kayit["ad"], k_id, k_ad, False, False, str(e)[:300], "")
+            raise
+        y = self.vt.yukleme_ekle(dosya_id, yid, kayit["ad"], k_id, k_ad, True, sonuc["baslatildi"], "", sonuc["dosya_adi"])
+        sonuc["yukleme_id"] = y["id"]; sonuc["dosya_id"] = dosya_id
+        return sonuc
+
     async def dosya_yukle_ve_baslat(self, yid: int, dosya_adi: str, yerel_yol, baslat: bool = True,
-                                    kullanici: str = "") -> dict:
+                                    kullanici: str = "", kaydet: bool = True) -> dict:
         kayit = self.kayitlar.get(yid)
         if kayit is None:
             raise LookupError("yazıcı bulunamadı")

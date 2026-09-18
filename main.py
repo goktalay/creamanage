@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from aiohttp import web  # noqa: E402
 
 from creamanage.ayarlar import ayarlari_oku  # noqa: E402
+from creamanage.dosyalar import DosyaKutuphanesi  # noqa: E402
 from creamanage.filo import Filo  # noqa: E402
 from creamanage.kullanicilar import KullaniciYonetimi  # noqa: E402
 from creamanage.surum import FIRMA, SURUM, URUN_ADI  # noqa: E402
@@ -44,7 +45,8 @@ async def calistir(argv: list[str] | None = None) -> None:
     log = logging.getLogger("creamanage")
     vt = Veritabani(ayar.veritabani)
     telemetri = TelemetriKayit(ayar.telemetri_dizini, ayar.telemetri_saklama_gun)
-    filo = Filo(vt, telemetri)
+    kutuphane = DosyaKutuphanesi(vt, ayar.dosya_dizini)
+    filo = Filo(vt, telemetri, kutuphane)
     telegram = TelegramBildirici(vt, api_taban=os.environ.get("CREAMANAGE_TELEGRAM_API") or "https://api.telegram.org")
     filo.olaylar.abone_ol(telegram.olay_geldi)
     await filo.baslat()
@@ -55,7 +57,7 @@ async def calistir(argv: list[str] | None = None) -> None:
     site = web.TCPSite(runner, ayar.host, ayar.port)
     await site.start()
     log.info("%s %s — %s — http://%s:%d/", URUN_ADI, SURUM, FIRMA, ayar.host, ayar.port)
-    log.info("telemetri kaydı: %s (saklama %d gün, saniyede 1 örnek)", ayar.telemetri_dizini, ayar.telemetri_saklama_gun)
+    log.info("telemetri kaydı: %s (saklama %d gün, saniyede 1 örnek); dosya kütüphanesi: %s", ayar.telemetri_dizini, ayar.telemetri_saklama_gun, ayar.dosya_dizini)
     if not kullanicilar.kullanici_var_mi():
         log.warning("Henüz kullanıcı yok: tarayıcıda /giris adresi ilk sistem yöneticisini oluşturmanızı isteyecek.")
     try:

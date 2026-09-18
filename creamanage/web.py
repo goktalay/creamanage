@@ -19,6 +19,7 @@ from .telegram import TelegramBildirici
 from . import yukleme as Y
 from . import hata_kodlari as HK
 from . import kamera as KAM
+from .dosyalar import DosyaKutuphanesi
 from .olaylar import yonetici_mi_gorur
 from .surum import FIRMA, SURUM, URUN_ADI, URUN_KODU
 
@@ -64,11 +65,15 @@ def gerekli_rol(yontem: str, yol: str) -> str:
         return "sistem_yoneticisi"
     if yol.startswith("/api/hata_kodlari") and yontem != "GET":
         return "sistem_yoneticisi"
+    if yontem == "PUT" and yol.startswith("/api/yazicilar/") and yol.endswith("/ad"):
+        return "gozetmen"                   # /api/yazicilar/{id}/ad: gözetmen de yazıcıyı adlandırabilir
     if yontem != "GET" and (yol in ("/api/yazicilar", "/api/yazicilar/toplu") or yol.startswith("/api/tarama")
                             or (yontem in ("PUT", "DELETE") and yol.startswith("/api/yazicilar/"))):
         return "sistem_yoneticisi"          # yazıcı ekleme/silme/ayar/tarama yalnız sistem yöneticisi
     if yol in ("/api/cikis", "/api/ben", "/api/ben/parola", "/api/ben/tercihler") or yol.endswith("/kamera/kayit"):
         return "gozetmen"
+    if yontem == "DELETE" and yol.startswith("/api/dosyalar/"):
+        return "sistem_yoneticisi"
     if yontem in ("POST", "PUT", "DELETE", "PATCH"):
         return "yazici_yoneticisi"
     return "gozetmen"
@@ -455,8 +460,14 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
             if not gecici or not dosya_adi:
                 return _hata("file alanı eksik")
             try:
-                sonuc = await filo.dosya_yukle_ve_baslat(yid, dosya_adi, gecici, baslat, istek["kullanici"]["kullanici_adi"])
-            except RuntimeError as e:
+                if filo.kutuphane is not None:
+                    d, yeni = filo.kutuphane.ekle(gecici, dosya_adi, istek["kullanici"])
+                    gecici = None if yeni else gecici           # taşındıysa silinmez
+                    _denetim(istek, "dosya_kutuphane_ekledi" if yeni else "dosya_kutuphane_ayni", d["ad"], f"{d['boyut'] // 1024} KB")
+                    sonuc = await filo.dosya_gonder(d["id"], yid, baslat, istek["kullanici"])
+                else:
+                    sonuc = await filo.dosya_yukle_ve_baslat(yid, dosya_adi, gecici, baslat, istek["kullanici"]["kullanici_adi"])
+            except (RuntimeError, ValueError) as e:
                 _denetim(istek, "dosya_yukleme_hatasi", _yazici_etiketi(yid), f"{dosya_adi}: {e}")
                 return _hata(str(e), 502)
             _denetim(istek, "dosya_yukledi", _yazici_etiketi(yid),
@@ -468,6 +479,142 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
                     os.unlink(gecici)
                 except OSError:
                     pass
+
+    # --- dosya sistemi (kütüphane → yüklemeler → baskılar) ---
+    def _kut() -> DosyaKutuphanesi:
+        if filo.kutuphane is None:
+            raise web.HTTPNotFound(text="dosya kütüphanesi etkin değil")
+        return filo.kutuphane
+
+    async def dosyalar_liste(istek):
+        durum = istek.query.get("durum") or None
+        return _json({"dosyalar": [DosyaKutuphanesi.gorunum(d) for d in filo.vt.dosyalar(durum)]})
+
+    async def dosya_ayrinti(istek):
+        did = int(istek.match_info["id"])
+        d = filo.vt.dosya(did)
+        if d is None:
+            return _hata("dosya bulunamadı", 404)
+        return _json({"dosya": DosyaKutuphanesi.gorunum(d), "yuklemeler": filo.vt.yuklemeler(did), "baskilar": filo.vt.baskilar(dosya_id=did)})
+
+    async def dosya_kutuphane_ekle(istek):
+        """multipart: file, aciklama — yazdırmadan kütüphaneye ekler."""
+        kut = _kut()
+        okuyucu = await istek.multipart()
+        ad, gecici, aciklama, boyut = "", None, "", 0
+        try:
+            async for parca in okuyucu:
+                if parca.name == "aciklama":
+                    aciklama = (await parca.text()).strip()[:500]
+                elif parca.name == "file":
+                    ad = Y.guvenli_dosya_adi(parca.filename or "")
+                    if not Y.uzanti_izinli_mi(ad):
+                        return _hata(f"yalnız {', '.join(Y.IZINLI_UZANTILAR)} dosyaları yüklenebilir")
+                    fd, gecici = tempfile.mkstemp(prefix="creamanage_", suffix="_" + ad)
+                    with os.fdopen(fd, "wb") as f:
+                        while True:
+                            veri = await parca.read_chunk(1024 * 1024)
+                            if not veri:
+                                break
+                            boyut += len(veri)
+                            if boyut > Y.EN_BUYUK_DOSYA:
+                                return _hata("dosya çok büyük", 413)
+                            f.write(veri)
+            if not gecici:
+                return _hata("file alanı eksik")
+            d, yeni = kut.ekle(gecici, ad, istek["kullanici"], aciklama)
+            if yeni:
+                gecici = None
+            _denetim(istek, "dosya_kutuphane_ekledi" if yeni else "dosya_kutuphane_ayni", d["ad"], f"{d['boyut'] // 1024} KB" + (f"; {aciklama}" if aciklama else ""))
+            await filo._yayinla({"tur": "dosyalar"})
+            return _json({"dosya": DosyaKutuphanesi.gorunum(d), "yeni": yeni}, 201)
+        finally:
+            if gecici:
+                try:
+                    os.unlink(gecici)
+                except OSError:
+                    pass
+
+    async def dosya_guncelle(istek):
+        did = int(istek.match_info["id"])
+        v = await _govde(istek)
+        alanlar = {}
+        if "aciklama" in v:
+            alanlar["aciklama"] = str(v["aciklama"]).strip()[:500]
+        if "durum" in v:
+            if v["durum"] not in ("aktif", "pasif"):
+                return _hata("durum aktif ya da pasif olmalı")
+            alanlar["durum"] = v["durum"]
+        d = filo.vt.dosya_guncelle(did, **alanlar)
+        if d is None:
+            return _hata("dosya bulunamadı", 404)
+        _denetim(istek, "dosya_guncelledi", d["ad"], ", ".join(f"{k}={v}" for k, v in alanlar.items()))
+        await filo._yayinla({"tur": "dosyalar"})
+        return _json({"dosya": DosyaKutuphanesi.gorunum(d)})
+
+    async def dosya_sil(istek):
+        did = int(istek.match_info["id"])
+        d = filo.vt.dosya(did)
+        if d is None or not _kut().sil(did):
+            return _hata("dosya bulunamadı", 404)
+        _denetim(istek, "dosya_sildi", d["ad"])
+        await filo._yayinla({"tur": "dosyalar"})
+        return _json({"silindi": did})
+
+    async def dosya_resim(istek):
+        d = filo.vt.dosya(int(istek.match_info["id"]))
+        if d is None or not d.get("resim_yol") or not os.path.exists(d["resim_yol"]):
+            return _hata("resim yok", 404)
+        return web.FileResponse(d["resim_yol"], headers={"Cache-Control": "max-age=86400"})
+
+    async def dosya_indir(istek):
+        d = filo.vt.dosya(int(istek.match_info["id"]))
+        if d is None or not d.get("yol") or not os.path.exists(d["yol"]):
+            return _hata("dosya yok", 404)
+        _denetim(istek, "dosya_indirdi", d["ad"])
+        return web.FileResponse(d["yol"], headers={"Content-Disposition": f'attachment; filename="{d["ad"]}"'})
+
+    async def dosya_gonder(istek):
+        did = int(istek.match_info["id"])
+        v = await _govde(istek)
+        yid = int(v.get("yazici_id") or 0)
+        if yid not in filo.kayitlar:
+            return _hata("yazıcı bulunamadı", 404)
+        baslat = v.get("baslat", True) not in (False, 0, "0", "false")
+        d = filo.vt.dosya(did)
+        if d is None:
+            return _hata("dosya bulunamadı", 404)
+        try:
+            sonuc = await filo.dosya_gonder(did, yid, baslat, istek["kullanici"])
+        except ValueError as e:
+            return _hata(str(e))
+        except (RuntimeError, LookupError) as e:
+            _denetim(istek, "dosya_yukleme_hatasi", _yazici_etiketi(yid), f"{d['ad']}: {e}")
+            await filo._yayinla({"tur": "dosyalar"})
+            return _hata(str(e), 502)
+        _denetim(istek, "dosya_yukledi", _yazici_etiketi(yid), f"{d['ad']} (kütüphane)" + ("; baskı başlatıldı" if sonuc["baslatildi"] else ("; başlatılmadı" if not baslat else "; BAŞLATILAMADI")))
+        await filo._yayinla({"tur": "dosyalar"})
+        return _json(sonuc, 201)
+
+    async def yazici_baskilar(istek):
+        yid = int(istek.match_info["id"])
+        if yid not in filo.kayitlar:
+            return _hata("yazıcı bulunamadı", 404)
+        return _json({"baskilar": filo.vt.baskilar(yazici_id=yid, limit=200), "yuklemeler": filo.vt.yuklemeler(yazici_id=yid, limit=200)})
+
+    async def yazici_adlandir(istek):
+        """Yalnız ad değişikliği — gözetmen dahil herkes."""
+        yid = int(istek.match_info["id"])
+        v = await _govde(istek)
+        ad = str(v.get("ad", "")).strip()
+        if not ad or len(ad) > 64:
+            return _hata("ad 1-64 karakter olmalı")
+        eski = (filo.kayitlar.get(yid) or {}).get("ad")
+        kayit = await filo.yazici_guncelle(yid, ad=ad)
+        if kayit is None:
+            return _hata("yazıcı bulunamadı", 404)
+        _denetim(istek, "yazici_adlandirdi", _yazici_etiketi(yid), f"{eski} → {ad}")
+        return _json({"yazici": kayit})
 
     async def aglar(_):
         return _json({"aglar": filo.aglar()})
@@ -658,6 +805,16 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
     app.router.add_delete(r"/api/yazicilar/{id:\d+}", yazici_sil)
     app.router.add_post(r"/api/yazicilar/{id:\d+}/komut", komut)
     app.router.add_post(r"/api/yazicilar/{id:\d+}/dosya", dosya_yukle)
+    app.router.add_get("/api/dosyalar", dosyalar_liste)
+    app.router.add_post("/api/dosyalar", dosya_kutuphane_ekle)
+    app.router.add_get(r"/api/dosyalar/{id:\d+}", dosya_ayrinti)
+    app.router.add_put(r"/api/dosyalar/{id:\d+}", dosya_guncelle)
+    app.router.add_delete(r"/api/dosyalar/{id:\d+}", dosya_sil)
+    app.router.add_get(r"/api/dosyalar/{id:\d+}/resim", dosya_resim)
+    app.router.add_get(r"/api/dosyalar/{id:\d+}/indir", dosya_indir)
+    app.router.add_post(r"/api/dosyalar/{id:\d+}/gonder", dosya_gonder)
+    app.router.add_get(r"/api/yazicilar/{id:\d+}/baskilar", yazici_baskilar)
+    app.router.add_put(r"/api/yazicilar/{id:\d+}/ad", yazici_adlandir)
     app.router.add_get(r"/api/yazicilar/{id:\d+}/kamera", kamera_goruntu)
     app.router.add_post(r"/api/yazicilar/{id:\d+}/kamera/kayit", kamera_kayit)
     app.router.add_get(r"/api/yazicilar/{id:\d+}/telemetri", telemetri_ornekler)

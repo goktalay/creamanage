@@ -1,7 +1,7 @@
 :root {
   --arka: #f4f6f9; --panel: #ffffff; --kenar: #dfe4ea; --metin: #1c2733; --soluk: #6b7785;
   --birincil: #1f5fbf; --birincil-metin: #fff; --tehlike: #c62828; --ust: #ffffff;
-  --d-basiyor: #1f8a4c; --d-bosta: #6b7785; --d-duraklatildi: #d98c00; --d-tamamlandi: #2c73d2;
+  --d-basiyor: #2c73d2; --d-bosta: #6b7785; --d-duraklatildi: #d98c00; --d-tamamlandi: #1f8a4c; --iyi: #1f8a4c;
   --d-hata: #c62828; --d-hazirlaniyor: #7b5cd6; --d-cevrimdisi: #9aa4ae;
   --golge: 0 1px 3px rgba(0,0,0,.08); --ust-yuk: 56px; --alt-yuk: 42px;
 }
@@ -69,11 +69,13 @@ code { background: rgba(127,127,127,.15); padding: 0 4px; border-radius: 3px; }
 .sayac b { margin-left: 4px; }
 .sayac[data-d]:not([data-d=""])::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: var(--renk); }
 .rozet { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--kenar); white-space: nowrap; }
-.rozet-bagli { color: var(--d-basiyor); border-color: var(--d-basiyor); }
+.rozet-bagli { color: var(--iyi); border-color: var(--iyi); }
 .rozet-kopuk { color: var(--tehlike); border-color: var(--tehlike); }
 
 /* ---------- düğmeler ---------- */
 .btn { border: 1px solid var(--kenar); background: var(--panel); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+a.btn { text-decoration: none; color: inherit; display: inline-block; }
+a.btn[aria-disabled="true"] { opacity: .5; pointer-events: none; }
 .btn:hover { filter: brightness(.96); }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn-birincil { background: var(--birincil); color: var(--birincil-metin); border-color: var(--birincil); }
@@ -131,7 +133,7 @@ code { background: rgba(127,127,127,.15); padding: 0 4px; border-radius: 3px; }
 .kucuk li { font-size: 12px; }
 .olaylar li time, .kucuk li time { color: var(--soluk); margin-right: 8px; font-variant-numeric: tabular-nums; }
 .kucuk.uzun { max-height: 70vh; overflow: auto; }
-.olay-uyari { color: var(--d-duraklatildi); } .olay-kritik { color: var(--tehlike); } .olay-basari { color: var(--d-basiyor); }
+.olay-uyari { color: var(--d-duraklatildi); } .olay-kritik { color: var(--tehlike); } .olay-basari { color: var(--iyi); }
 
 /* ---------- modallar ---------- */
 .ortu { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 10; padding: 16px; }
@@ -320,3 +322,45 @@ progress#tarama-cubuk { width: 100%; height: 12px; }
 .kamera-goruntu.aliniyor::after { content: "Görüntü alınıyor…"; position: absolute; inset: auto 0 12px; text-align: center; color: #fff; font-size: 13px; background: rgba(0,0,0,.45); padding: 6px; }
 .kamera-arac { margin-top: 10px; flex-wrap: wrap; }
 .kamera-zaman { position: absolute; left: 10px; bottom: 10px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; padding: 3px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+
+/* ---------- dosya sistemi ---------- */
+.ds-arac { margin-bottom: 12px; }
+.ds-panel { padding: 0; overflow: hidden; }
+.ds-kaydir { max-height: 52vh; border: 0; border-radius: 0; }
+.ds-tablo th, .ds-tablo td { padding: 7px 10px; vertical-align: middle; }
+.ds-tablo tbody tr { cursor: pointer; }
+.ds-tablo tbody tr:hover td { background: rgba(127,127,127,.08); }
+.ds-tablo tbody tr.secili td { background: rgba(31,95,191,.12); }
+.ds-tablo tr.pasif td:not(.eylem) { opacity: .55; }
+.ds-tablo td.ad { font-weight: 600; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-tablo td.aciklama { max-width: 320px; }
+.ds-tablo td.aciklama input { width: 100%; }
+.ds-tablo td.zaman { white-space: nowrap; color: var(--soluk); font-size: 12px; }
+.ds-tablo td.boyut, .ds-tablo th.sag-hiza { text-align: right; white-space: nowrap; }
+.ds-resim { width: 56px; height: 56px; object-fit: contain; border-radius: 6px; background: var(--arka); border: 1px solid var(--kenar); display: block; }
+.ds-resim-yok { display: inline-grid; place-items: center; width: 56px; height: 56px; border-radius: 6px; border: 1px dashed var(--kenar); color: var(--soluk); font-size: 11px; }
+.durum-etiket { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: 10px; font-size: 12px; font-weight: 600; border: 1px solid var(--renk); color: var(--renk); white-space: nowrap; }
+.durum-etiket::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--renk); }
+button.durum-etiket { background: transparent; cursor: pointer; }
+button.durum-etiket:hover { background: rgba(127,127,127,.1); }
+.ds-alt { display: grid; grid-template-columns: 1fr 1.3fr; gap: 12px; margin-top: 12px; }
+.ds-alt .panel { padding: 10px 12px; min-width: 0; }
+.ds-baslik h3 { margin: 2px 0 8px; }
+.ds-kaydir-kucuk { max-height: 34vh; }
+.ds-secilebilir tbody tr { cursor: pointer; }
+.ds-secilebilir tbody tr:hover td { background: rgba(127,127,127,.08); }
+.ds-secilebilir tbody tr.secili td { background: rgba(31,95,191,.12); }
+.sonuc-tamamlandi { color: var(--iyi); font-weight: 600; } .sonuc-hata, .sonuc-iptal { color: var(--tehlike); font-weight: 600; }
+.sonuc-suruyor { color: var(--d-basiyor); font-weight: 600; } .sonuc-bilinmiyor { color: var(--soluk); }
+@media (max-width: 900px) { .ds-alt { grid-template-columns: 1fr; } }
+
+/* ---------- kütüphaneden seçici ---------- */
+.modal.secici { display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 8px; max-height: 88vh; }
+.secici-kaydir { max-height: 56vh; }
+.secici-kaydir .tablo td { padding: 6px 8px; vertical-align: middle; }
+.secici-kaydir .ds-resim { width: 44px; height: 44px; }
+#secici-arama { min-width: 240px; }
+.kalem { border: 0; background: transparent; color: var(--soluk); cursor: pointer; font-size: 14px; padding: 0 4px; border-radius: 4px; vertical-align: 1px; }
+.kalem:hover { color: var(--birincil); background: rgba(127,127,127,.12); }
+.ay-ad-form { display: inline-flex; gap: 6px; align-items: center; }
+.ay-ad-form input { padding: 3px 8px; border: 1px solid var(--kenar); border-radius: 6px; background: var(--panel); font-size: 15px; font-weight: 600; min-width: 220px; }

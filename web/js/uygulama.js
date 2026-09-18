@@ -11,7 +11,7 @@
   const $ = (s, k) => (k || document).querySelector(s);
   const $$ = (s, k) => Array.from((k || document).querySelectorAll(s));
 
-  const MODULLER = { yazicilar: "Yazıcılar", dosya_listesi: "Dosya Listesi", dosya_yoneticisi: "Dosya Yöneticisi",
+  const MODULLER = { yazicilar: "Yazıcılar", dosya_listesi: "Dosya Listesi", dosya_yoneticisi: "Dosya Yöneticisi", dosya_sistemi: "Dosya Sistemi",
     olaylar: "Olaylar", bildirimler: "Bildirimler", kullanicilar: "Kullanıcılar", hata_kodlari: "Hata Kodları" };
   const MODUL_GORUNUM = { yazicilar: "kart", dosya_listesi: "sade", dosya_yoneticisi: "yukle" };
   // ---------- yenileme aralığı: sunucudan gelen güncellemeler tamponlanır, seçilen aralıkta ekrana uygulanır ----------
@@ -136,6 +136,9 @@
         if (m.olay.seviye === "kritik" || m.olay.seviye === "uyari") bildir(m.olay.mesaj, 5000);
       } else if (m.tur === "tarama") {
         st.tarama = m.tarama; taramaGuncelle();
+      } else if (m.tur === "dosyalar") {
+        if (st.modul === "dosya_sistemi") dosyaSistemiAc(true);
+        if (!$("#ortu-secici").hidden && seciciTur === "dosya") seciciDosyalariYukle();
       }
     };
   }
@@ -202,6 +205,7 @@
     if (ad === "bildirimler") bildirimAc();
     if (ad === "olaylar") cizOlaylar();
     if (ad === "hata_kodlari") hataKodlariAc();
+    if (ad === "dosya_sistemi") dosyaSistemiAc();
   }
   function menuKapat() { $("#menu-uygulamalar").hidden = true; $("#menu-hesap").hidden = true; $("#btn-uygulamalar").classList.remove("acik"); }
   const yuklemeler = new Map();   // yazıcı id → {yuzde, metin}
@@ -210,7 +214,7 @@
     const yetkiliMi = yetkili("yazici_yoneticisi"), bos = !c.dosya;
     let orta;
     if (yk) orta = `<div class="dosya-metin">${kacis(yk.metin)}<progress max="100" value="${yk.yuzde}"></progress></div>`;
-    else if (yetkiliMi) orta = `<button type="button" class="dosya-btn ${bos ? "bos" : ""}" ${d === "cevrimdisi" ? "disabled" : ""} title="${kacis(c.dosya_yolu || "")}">${bos ? "Dosya seç ve yazdır" : kacis(c.dosya)}<small>${d === "cevrimdisi" ? "yazıcı çevrimdışı" : (bos ? "" : "değiştirmek için tıklayın")}</small></button>`;
+    else if (yetkiliMi) orta = `<button type="button" class="dosya-btn ${bos ? "bos" : ""}" ${d === "cevrimdisi" ? "disabled" : ""} title="${kacis(c.dosya_yolu || "")}">${bos ? "Dosya seç ve yazdır" : kacis(c.dosya)}<small>${d === "cevrimdisi" ? "yazıcı çevrimdışı" : (bos ? "kütüphanedeki aktif dosyalardan" : "değiştirmek için tıklayın")}</small></button>`;
     else orta = `<div class="dosya-metin" title="${kacis(c.dosya_yolu || "")}">${bos ? '<span class="ipucu">–</span>' : kacis(c.dosya)}</div>`;
     const aktif = c.ilerleme != null && (d === "basiyor" || d === "duraklatildi"), ilerleme = aktif ? Math.round(c.ilerleme) : null;
     return `<div class="bas"><span title="${kacis(y.ad)}">${kacis(y.ad)}</span><span class="durum">${DURUM_AD[d] || d}</span></div>
@@ -323,7 +327,7 @@
         <div class="ipucu">Kod ${kacis(h.kod || c.hata_anahtari || c.hata_kodu)}${h.sinif ? " · " + kacis(h.sinif) : ""}${h.modul ? " · " + kacis(h.modul) : ""}</div>
         ${h.aciklama ? `<div>${kacis(h.aciklama)}</div>` : ""}${h.cozum ? `<div class="ipucu"><b>Çözüm:</b> ${kacis(h.cozum)}</div>` : ""}
         ${h.bilinen ? "" : `<div class="ipucu">Bu kodun açıklaması tabloda yok. Sunucuda <code>python araclar/hata_kodlari_al.py</code> ile Creality tablosunu indirin.</div>`}</div></div>`;
-    } else kap.innerHTML = `<div class="hata-simdi" style="--renk: var(--d-basiyor)"><span class="bk-ikon">${IKON.check}</span><div><b>Şu an hata yok</b><div class="ipucu">Yazıcı sorun bildirmiyor.</div></div></div>`;
+    } else kap.innerHTML = `<div class="hata-simdi" style="--renk: var(--iyi)"><span class="bk-ikon">${IKON.check}</span><div><b>Şu an hata yok</b><div class="ipucu">Yazıcı sorun bildirmiyor.</div></div></div>`;
     try {
       const v = await api(`/api/yazicilar/${id}/hatalar`);
       const satirlar = [];
@@ -446,7 +450,7 @@
     const csv = "\ufeff" + kolon.join(";") + "\n" + ayGecmisVeri.slice().reverse().map(satir).join("\n");
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = `${y.ad}_telemetri.csv`; a.click(); URL.revokeObjectURL(a.href);
   });
-  $("#ay-dosya-btn").addEventListener("click", () => { yukleHedef = st.acikYazici; $("#dosya-secici").value = ""; $("#dosya-secici").click(); });
+  $("#ay-dosya-btn").addEventListener("click", () => dosyaSeciciAc(st.acikYazici));
 
   // ---------- kamera: sunucu URL'si ya da tarayıcıdan doğrudan WebRTC (K2 webrtc_local) ----------
   let kameraSonId = null, kameraSonPng = null;
@@ -567,7 +571,7 @@
   }
   function ayrintiDoldur(y) {
     const c = y.canli || {}, d = c.durum || "cevrimdisi", renk = `var(--d-${d})`;
-    $("#ay-baslik").textContent = y.ad;
+    $("#ay-baslik").firstChild.textContent = y.ad + " ";
     $("#ay-altbaslik").textContent = [y.ip, c.model_adi || c.model || y.model, y.grup].filter(Boolean).join(" · ");
     $("#ay-ikon").innerHTML = IKON.printer; $("#ay-ikon").style.setProperty("--renk", renk);
     const dr = $("#ay-durum"); dr.textContent = DURUM_AD[d] || d; dr.style.setProperty("--renk", renk);
@@ -584,12 +588,12 @@
       bilgiKart("nozzle", "Nozul", c.nozul != null ? Number(c.nozul).toFixed(0) + "°" : null, { alt: c.nozul_hedef ? `hedef ${Number(c.nozul_hedef).toFixed(0)}°` : "hedef yok", renk: isitiyor(c.nozul, c.nozul_hedef) }),
       bilgiKart("bed", "Tabla", c.tabla != null ? Number(c.tabla).toFixed(0) + "°" : null, { alt: c.tabla_hedef ? `hedef ${Number(c.tabla_hedef).toFixed(0)}°` : "hedef yok", renk: isitiyor(c.tabla, c.tabla_hedef) }),
       bilgiKart("box", "Kabin", c.kabin != null ? Number(c.kabin).toFixed(0) + "°" : null, { alt: c.kabin_hedef ? `hedef ${Number(c.kabin_hedef).toFixed(0)}°` : "", renk: isitiyor(c.kabin, c.kabin_hedef) }),
-      bilgiKart("fan", "Fan", c.fan != null ? "%" + c.fan : null, { renk: c.fan ? "var(--d-tamamlandi)" : "var(--soluk)", yuzde: c.fan != null ? Number(c.fan) : null }),
+      bilgiKart("fan", "Fan", c.fan != null ? "%" + c.fan : null, { renk: c.fan ? "var(--birincil)" : "var(--soluk)", yuzde: c.fan != null ? Number(c.fan) : null }),
       bilgiKart("gauge", "Hız", c.hiz_yuzde != null ? "%" + c.hiz_yuzde : null, { renk: "var(--d-hazirlaniyor)", yuzde: c.hiz_yuzde != null ? Math.min(100, Number(c.hiz_yuzde)) : null }),
       bilgiKart(c.isik ? "bulb" : "bulb-off", "Işık", c.isik == null ? null : (c.isik ? "Açık" : "Kapalı"), { renk: c.isik ? "var(--d-duraklatildi)" : "var(--soluk)" }),
-      bilgiKart("spool", "CFS", c.cfs_bagli ? "Bağlı" : "Yok", { renk: c.cfs_bagli ? "var(--d-basiyor)" : "var(--soluk)", pasifBos: false }),
-      bilgiKart("wifi", "Bağlantı", c.baglanti === "bagli" ? "Bağlı" : (c.baglanti === "baglaniyor" ? "Bağlanıyor" : "Kopuk"), { alt: c.son_veri ? "son veri " + saat(c.son_veri) : (c.son_hata || ""), renk: c.baglanti === "bagli" ? "var(--d-basiyor)" : "var(--d-hata)", pasifBos: false }),
-      bilgiKart(c.hata_kodu ? "alert" : "check", "Hata", c.hata_kodu ? ((st.ayHata && st.ayHata.bilinen) ? st.ayHata.metin : `Kod ${c.hata_anahtari || c.hata_kodu}`) : "Yok", { alt: c.hata_kodu ? (st.ayHata && st.ayHata.sinif ? st.ayHata.sinif + " · kod " + (c.hata_anahtari || c.hata_kodu) : "ayrıntı: Yazıcı Hataları") : "sorun bildirilmedi", renk: c.hata_kodu ? "var(--d-hata)" : "var(--d-basiyor)", pasifBos: false, genis: !!c.hata_kodu }),
+      bilgiKart("spool", "CFS", c.cfs_bagli ? "Bağlı" : "Yok", { renk: c.cfs_bagli ? "var(--iyi)" : "var(--soluk)", pasifBos: false }),
+      bilgiKart("wifi", "Bağlantı", c.baglanti === "bagli" ? "Bağlı" : (c.baglanti === "baglaniyor" ? "Bağlanıyor" : "Kopuk"), { alt: c.son_veri ? "son veri " + saat(c.son_veri) : (c.son_hata || ""), renk: c.baglanti === "bagli" ? "var(--iyi)" : "var(--d-hata)", pasifBos: false }),
+      bilgiKart(c.hata_kodu ? "alert" : "check", "Hata", c.hata_kodu ? ((st.ayHata && st.ayHata.bilinen) ? st.ayHata.metin : `Kod ${c.hata_anahtari || c.hata_kodu}`) : "Yok", { alt: c.hata_kodu ? (st.ayHata && st.ayHata.sinif ? st.ayHata.sinif + " · kod " + (c.hata_anahtari || c.hata_kodu) : "ayrıntı: Yazıcı Hataları") : "sorun bildirilmedi", renk: c.hata_kodu ? "var(--d-hata)" : "var(--iyi)", pasifBos: false, genis: !!c.hata_kodu }),
       bilgiKart("cpu", "Model", c.model_adi || c.model || y.model, { alt: c.yazilim_surumu ? "yazılım " + c.yazilim_surumu : (c.model || ""), renk: "var(--soluk)" }),
       bilgiKart("tag", "Grup", y.grup, { alt: y.notlar || "", renk: "var(--soluk)" }),
     ].join("");
@@ -826,7 +830,8 @@
     yazici_ekledi: "Yazıcı ekledi", yazici_guncelledi: "Yazıcı güncelledi", yazici_sildi: "Yazıcı sildi", tarama_baslatti: "Ağ taraması başlattı",
     bildirim_ayarladi: "Bildirim ayarı değiştirdi", bildirim_test: "Bildirim testi gönderdi", tarama_iptal: "Ağ taramasını iptal etti", komut_duraklat: "Baskıyı durdurdu (duraklattı)", komut_surdur: "Baskıyı başlattı (sürdürdü)",
     komut_durdur: "Baskıyı iptal etti", komut_isik: "Işığı değiştirdi", komut_nozul: "Nozul sıcaklığı ayarladı", komut_tabla: "Tabla sıcaklığı ayarladı",
-    komut_fan: "Fan ayarladı", dosya_yukledi: "Dosya yükledi ve yazdırdı", dosya_yukleme_hatasi: "Dosya yükleme HATASI", hata_kodu_kaydetti: "Hata kodu ekledi/güncelledi", hata_kodu_sildi: "Hata kodu sildi", hata_kodu_ice_aktardi: "Hata kodu tablosu içe aktardı", kamera_goruntu: "Kamera görüntüsü aldı", kamera_goruntu_hatasi: "Kamera görüntüsü alınamadı" };
+    komut_fan: "Fan ayarladı", dosya_yukledi: "Dosya yükledi ve yazdırdı", dosya_yukleme_hatasi: "Dosya yükleme HATASI", hata_kodu_kaydetti: "Hata kodu ekledi/güncelledi", hata_kodu_sildi: "Hata kodu sildi", hata_kodu_ice_aktardi: "Hata kodu tablosu içe aktardı", kamera_goruntu: "Kamera görüntüsü aldı", kamera_goruntu_hatasi: "Kamera görüntüsü alınamadı",
+    yazici_adlandirdi: "Yazıcı adını değiştirdi", dosya_kutuphane_ekledi: "Kütüphaneye dosya ekledi", dosya_kutuphane_ayni: "Kütüphanede var olan dosyayı yükledi", dosya_guncelledi: "Dosya kaydını güncelledi", dosya_sildi: "Kütüphaneden dosya sildi", dosya_indirdi: "Dosya indirdi" };
   async function gecmisAc(id) {
     try {
       const v = await api(id == null ? "/api/kullanicilar/gecmis?limit=1000" : `/api/kullanicilar/${id}/gecmis`);
@@ -911,38 +916,202 @@
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") $$(".ortu").forEach(o => { if (!o.hidden) kapat(o.id); }); });
   $("#kartlar").addEventListener("click", (e) => { const k = e.target.closest(".kart"); if (k) ayrintiAc(Number(k.dataset.id)); });
   $("#sade").addEventListener("click", (e) => { const tr = e.target.closest("tr[data-id]"); if (tr) ayrintiAc(Number(tr.dataset.id)); });
-  let yukleHedef = null;
   $("#yukle").addEventListener("click", (e) => {
     const b = e.target.closest(".dosya-btn");
     const k = e.target.closest(".ykart"); if (!k) return;
-    if (b && !b.disabled) { yukleHedef = Number(k.dataset.id); $("#dosya-secici").value = ""; $("#dosya-secici").click(); return; }
+    if (b && !b.disabled) { dosyaSeciciAc(Number(k.dataset.id)); return; }
     if (!b) ayrintiAc(Number(k.dataset.id));
   });
-  $("#dosya-secici").addEventListener("change", () => {
-    const dosya = $("#dosya-secici").files[0], id = yukleHedef, y = st.yazicilar.get(id);
-    if (!dosya || !y) return;
-    const c = y.canli || {}, mesaj = (c.durum === "basiyor" || c.durum === "duraklatildi")
-      ? `DİKKAT: ${y.ad} şu an "${c.dosya}" basıyor (%${Math.round(c.ilerleme || 0)}).\n\nBu işlem mevcut işlemi durduracak ve "${dosya.name}" dosyasını yazdırmaya başlayacak.\n\nDevam edilsin mi?`
-      : `${y.ad} yazıcısına "${dosya.name}" yüklenip yazdırılacak.\n\nBu işlem mevcut işlemi durduracak. Devam edilsin mi?`;
-    if (!confirm(mesaj)) return;
-    dosyaYukle(id, dosya);
+  // Kütüphanedeki dosyayı yazıcıya gönderir (yükler ve baskıyı başlatır)
+  async function dosyaGonder(dosyaId, yaziciId, dosyaAdi) {
+    const y = st.yazicilar.get(yaziciId); if (!y) return;
+    yuklemeler.set(yaziciId, { yuzde: 100, metin: `Yükleniyor: ${dosyaAdi}` }); cizKart(y);
+    try {
+      const v = await post(`/api/dosyalar/${dosyaId}/gonder`, { yazici_id: yaziciId, baslat: true });
+      bildir(v.baslatildi ? `${y.ad}: ${v.dosya_adi} yüklendi, baskı başlatıldı` : `${y.ad}: ${v.dosya_adi} yüklendi ama baskı başlatılamadı (bağlantı yok)`, 6000);
+    } catch (err) { bildir(`${y.ad}: yükleme başarısız — ${err.message}`, 8000); }
+    finally { yuklemeler.delete(yaziciId); const g = st.yazicilar.get(yaziciId); if (g) cizKart(g); }
+  }
+
+  // ---------- kütüphaneden seçici: dosya seç (hedef yazıcı belli) ya da yazıcı seç (dosya belli) ----------
+  let seciciTur = "dosya", seciciHedef = null, seciciSecim = null, seciciListe = [];
+  function dosyaSeciciAc(yaziciId) {
+    const y = st.yazicilar.get(yaziciId); if (!y) return;
+    seciciTur = "dosya"; seciciHedef = yaziciId; seciciSecim = null;
+    $("#secici-baslik").textContent = "Dosya Seç ve Yazdır";
+    $("#secici-alt").textContent = `${y.ad} (${y.ip}) · Dosya Sistemi'ndeki aktif dosyalar`;
+    $("#secici-tablo thead").innerHTML = "<tr><th></th><th>Dosya Adı</th><th>Açıklama</th><th>Yükleyen</th><th>Yükleme Zamanı</th><th class=\"sag-hiza\">Boyut</th></tr>";
+    $("#secici-uyari").textContent = "Seçilen dosya yazıcıya yüklenir ve baskı başlatılır. Bu işlem yazıcıdaki mevcut işlemi durduracak.";
+    $("#secici-onay").textContent = "Gönder ve Yazdır"; $("#secici-onay").disabled = true; $("#secici-arama").value = "";
+    ac("ortu-secici"); seciciDosyalariYukle();
+  }
+  function yaziciSeciciAc(dosya) {
+    seciciTur = "yazici"; seciciHedef = dosya.id; seciciSecim = null;
+    $("#secici-baslik").textContent = "Yazıcıya Gönder";
+    $("#secici-alt").textContent = `${dosya.ad} · gönderilecek yazıcıyı seçin`;
+    $("#secici-tablo thead").innerHTML = "<tr><th></th><th>Yazıcı</th><th>IP</th><th>Durum</th><th>Şu anki dosya</th></tr>";
+    $("#secici-uyari").textContent = "Dosya seçilen yazıcıya yüklenir ve baskı başlatılır. Bu işlem yazıcıdaki mevcut işlemi durduracak.";
+    $("#secici-onay").textContent = "Gönder ve Yazdır"; $("#secici-onay").disabled = true; $("#secici-arama").value = "";
+    ac("ortu-secici"); seciciCiz();
+  }
+  async function seciciDosyalariYukle() {
+    try { seciciListe = (await api("/api/dosyalar?durum=aktif")).dosyalar; } catch (e) { bildir(e.message); seciciListe = []; }
+    seciciCiz();
+  }
+  function seciciCiz() {
+    const q = $("#secici-arama").value.trim().toLowerCase(), tb = $("#secici-tablo tbody");
+    let satirlar;
+    if (seciciTur === "dosya") {
+      const liste = seciciListe.filter(d => !q || `${d.ad} ${d.aciklama} ${d.yukleyen_adi}`.toLowerCase().includes(q));
+      if (!liste.some(d => d.id === seciciSecim)) seciciSecim = null;
+      satirlar = liste.map(d => `<tr data-id="${d.id}" class="${d.id === seciciSecim ? "secili" : ""}"><td>${dosyaResimHtml(d)}</td><td class="ad" title="${kacis(d.ad)}">${kacis(d.ad)}</td><td>${kacis(d.aciklama)}</td><td>${kacis(d.yukleyen_adi)}</td><td class="zaman">${tarih(d.zaman)}</td><td class="boyut">${boyutMetin(d.boyut)}</td></tr>`);
+      $("#secici-bos").textContent = seciciListe.length ? "Aramayla eşleşen dosya yok." : "Kütüphanede aktif dosya yok. Önce Dosya Sistemi'nden dosya ekleyin.";
+      $("#secici-sayi").textContent = `${liste.length} dosya`;
+    } else {
+      const liste = Array.from(st.yazicilar.values()).filter(y => !q || `${y.ad} ${y.ip} ${y.grup || ""}`.toLowerCase().includes(q)).sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
+      if (!liste.some(y => y.id === seciciSecim)) seciciSecim = null;
+      satirlar = liste.map(y => { const c = y.canli || {}, d = c.durum || "cevrimdisi"; return `<tr data-id="${y.id}" class="${y.id === seciciSecim ? "secili" : ""} ${d === "cevrimdisi" ? "pasif" : ""}"><td><input type="radio" name="secici" ${y.id === seciciSecim ? "checked" : ""} ${d === "cevrimdisi" ? "disabled" : ""}></td><td class="ad">${kacis(y.ad)}</td><td>${kacis(y.ip)}</td><td><span class="durum-etiket" style="--renk: var(--d-${d})">${DURUM_AD[d] || d}</span></td><td title="${kacis(c.dosya_yolu || "")}">${kacis(c.dosya || "–")}${c.ilerleme != null && (d === "basiyor" || d === "duraklatildi") ? ` (%${Math.round(c.ilerleme)})` : ""}</td></tr>`; });
+      $("#secici-bos").textContent = "Kayıtlı yazıcı yok.";
+      $("#secici-sayi").textContent = `${liste.length} yazıcı`;
+    }
+    tb.innerHTML = satirlar.join(""); $("#secici-bos").hidden = satirlar.length > 0;
+    $("#secici-onay").disabled = seciciSecim == null;
+  }
+  $("#secici-arama").addEventListener("input", seciciCiz);
+  function seciciSecimUygula() {
+    $$("#secici-tablo tbody tr").forEach(r => { const sec = Number(r.dataset.id) === seciciSecim; r.classList.toggle("secili", sec); const radyo = $("input[type=radio]", r); if (radyo) radyo.checked = sec; });
+    $("#secici-onay").disabled = seciciSecim == null;
+  }
+  $("#secici-tablo").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-id]"); if (!tr || tr.classList.contains("pasif")) return;
+    seciciSecim = Number(tr.dataset.id); seciciSecimUygula();
   });
-  function dosyaYukle(id, dosya) {
-    const y = st.yazicilar.get(id); if (!y) return;
-    yuklemeler.set(id, { yuzde: 0, metin: `Yükleniyor: ${dosya.name}` }); cizKart(y);
-    const fd = new FormData(); fd.append("file", dosya, dosya.name); fd.append("baslat", "1");
-    const xhr = new XMLHttpRequest(); xhr.open("POST", `/api/yazicilar/${id}/dosya`);
-    xhr.upload.onprogress = (e) => { if (e.lengthComputable) { yuklemeler.set(id, { yuzde: Math.round(100 * e.loaded / e.total), metin: `Yükleniyor: ${dosya.name} (%${Math.round(100 * e.loaded / e.total)})` }); cizKart(st.yazicilar.get(id)); } };
+  $("#secici-tablo").addEventListener("dblclick", (e) => { const tr = e.target.closest("tr[data-id]"); if (tr && !tr.classList.contains("pasif")) { seciciSecim = Number(tr.dataset.id); seciciSecimUygula(); $("#secici-onay").click(); } });
+  $("#secici-onay").addEventListener("click", () => {
+    if (seciciSecim == null) return;
+    const dosyaId = seciciTur === "dosya" ? seciciSecim : seciciHedef, yaziciId = seciciTur === "dosya" ? seciciHedef : seciciSecim;
+    const y = st.yazicilar.get(yaziciId), d = seciciTur === "dosya" ? seciciListe.find(x => x.id === dosyaId) : dsListe.find(x => x.id === dosyaId);
+    if (!y || !d) return;
+    const c = y.canli || {}, mesaj = (c.durum === "basiyor" || c.durum === "duraklatildi")
+      ? `DİKKAT: ${y.ad} şu an "${c.dosya}" basıyor (%${Math.round(c.ilerleme || 0)}).\n\nBu işlem mevcut işlemi durduracak ve "${d.ad}" dosyasını yazdırmaya başlayacak.\n\nDevam edilsin mi?`
+      : `${y.ad} yazıcısına "${d.ad}" yüklenip yazdırılacak.\n\nBu işlem mevcut işlemi durduracak. Devam edilsin mi?`;
+    if (!confirm(mesaj)) return;
+    kapat("ortu-secici");
+    dosyaGonder(dosyaId, yaziciId, d.ad);
+  });
+
+  // ---------- Dosya Sistemi modülü (herkes görür) ----------
+  let dsListe = [], dsSecili = null, dsYuklemeSecili = null, dsAyrinti = null;
+  const tarih = (ts) => ts ? new Date(ts * 1000).toLocaleString("tr-TR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "–";
+  function sureTam(sn) { sn = Math.max(0, Math.round(Number(sn) || 0)); if (sn < 60) return sn + " sn"; if (sn < 3600) return `${Math.floor(sn / 60)} dk ${sn % 60} sn`; return sure(sn); }
+  function boyutMetin(b) { b = Number(b) || 0; if (b < 1024) return b + " B"; if (b < 1048576) return (b / 1024).toFixed(0) + " KB"; return (b / 1048576).toFixed(2) + " MB"; }
+  const dosyaResimHtml = (d) => d.resim_var ? `<img class="ds-resim" src="/api/dosyalar/${d.id}/resim" alt="" loading="lazy">` : '<span class="ds-resim-yok">resim yok</span>';
+  const SONUC_AD = { suruyor: "Sürüyor", tamamlandi: "Tamamlandı", hata: "Hata", iptal: "İptal edildi", bilinmiyor: "Bilinmiyor" };
+  async function dosyaSistemiAc(sessiz) {
+    try { dsListe = (await api("/api/dosyalar")).dosyalar; } catch (e) { if (!sessiz) bildir(e.message); return; }
+    dsTablo();
+    if (dsSecili != null) { if (dsListe.some(d => d.id === dsSecili)) dsAyrintiYukle(dsSecili); else { dsSecili = null; $("#ds-alt").hidden = true; } }
+  }
+  function dsTablo() {
+    const q = $("#ds-arama").value.trim().toLowerCase(), f = $("#ds-filtre").value;
+    const liste = dsListe.filter(d => (!f || d.durum === f) && (!q || `${d.ad} ${d.aciklama} ${d.yukleyen_adi}`.toLowerCase().includes(q)));
+    const yonetici = yetkili("yazici_yoneticisi"), admin = yetkili("sistem_yoneticisi");
+    $("#ds-tablo tbody").innerHTML = liste.map(d => `<tr data-id="${d.id}" class="${d.durum === "pasif" ? "pasif" : ""} ${d.id === dsSecili ? "secili" : ""}">
+      <td>${yonetici ? `<button type="button" class="durum-etiket" data-eylem="durum" title="Değiştirmek için tıklayın" style="--renk: var(--${d.durum === "aktif" ? "iyi" : "soluk"})">${d.durum === "aktif" ? "Aktif" : "Pasif"}</button>` : `<span class="durum-etiket" style="--renk: var(--${d.durum === "aktif" ? "iyi" : "soluk"})">${d.durum === "aktif" ? "Aktif" : "Pasif"}</span>`}</td>
+      <td class="zaman">${tarih(d.zaman)}</td>
+      <td>${kacis(d.yukleyen_adi || "–")}</td>
+      <td class="ad" title="${kacis(d.ad)}${d.var ? "" : " (dosya diskte yok)"}">${kacis(d.ad)}${d.var ? "" : ' <span class="olay-kritik">!</span>'}</td>
+      <td class="aciklama">${yonetici ? `<input type="text" class="aciklama-giris" value="${kacis(d.aciklama)}" placeholder="Açıklama…" data-eski="${kacis(d.aciklama)}">` : kacis(d.aciklama || "–")}</td>
+      <td class="boyut" title="${d.boyut} bayt">${boyutMetin(d.boyut)}</td>
+      <td>${dosyaResimHtml(d)}</td>
+      <td class="eylem">${yonetici ? `<button class="btn btn-birincil" data-eylem="gonder" ${d.durum !== "aktif" || !d.var ? "disabled" : ""} title="${d.durum !== "aktif" ? "Pasif dosya gönderilemez" : "Yazıcı seçip yükle ve yazdır"}">Yazıcıya Gönder</button> ` : ""}<a class="btn" href="/api/dosyalar/${d.id}/indir" download="${kacis(d.ad)}" data-eylem="indir" ${d.var ? "" : 'aria-disabled="true"'}>İndir</a>${admin ? ' <button class="btn btn-tehlike" data-eylem="sil">Sil</button>' : ""}</td>
+    </tr>`).join("");
+    $("#ds-sayi").textContent = `${liste.length} / ${dsListe.length} dosya · aktif ${dsListe.filter(d => d.durum === "aktif").length}`;
+    $("#ds-bos").hidden = dsListe.length > 0;
+  }
+  ["#ds-arama", "#ds-filtre"].forEach(s => $(s).addEventListener("input", dsTablo));
+  $("#ds-tablo").addEventListener("click", async (e) => {
+    const tr = e.target.closest("tr[data-id]"); if (!tr) return;
+    const id = Number(tr.dataset.id), d = dsListe.find(x => x.id === id), b = e.target.closest("[data-eylem]");
+    if (e.target.closest("input")) return;
+    if (b) {
+      e.preventDefault();
+      try {
+        if (b.dataset.eylem === "durum") { await put(`/api/dosyalar/${id}`, { durum: d.durum === "aktif" ? "pasif" : "aktif" }); bildir(d.durum === "aktif" ? `${d.ad} pasife alındı` : `${d.ad} aktif edildi`); }
+        else if (b.dataset.eylem === "gonder") yaziciSeciciAc(d);
+        else if (b.dataset.eylem === "indir") { if (d.var) location.href = b.href; }
+        else if (b.dataset.eylem === "sil") { if (!confirm(`"${d.ad}" kütüphaneden silinsin mi?\n\nYükleme ve baskı kayıtları kalır, dosya diskten silinir.`)) return; await del(`/api/dosyalar/${id}`); bildir("Silindi"); if (dsSecili === id) { dsSecili = null; $("#ds-alt").hidden = true; } }
+      } catch (err) { bildir(err.message, 6000); }
+      return;
+    }
+    dsSecili = id; dsYuklemeSecili = null;
+    $$("#ds-tablo tbody tr").forEach(r => r.classList.toggle("secili", Number(r.dataset.id) === id));
+    dsAyrintiYukle(id);
+  });
+  $("#ds-tablo").addEventListener("change", async (e) => {
+    const g = e.target.closest(".aciklama-giris"); if (!g) return;
+    const tr = g.closest("tr"), id = Number(tr.dataset.id);
+    if (g.value.trim() === g.dataset.eski) return;
+    try { await put(`/api/dosyalar/${id}`, { aciklama: g.value.trim() }); g.dataset.eski = g.value.trim(); bildir("Açıklama kaydedildi"); } catch (err) { bildir(err.message, 6000); }
+  });
+  $("#ds-tablo").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.closest(".aciklama-giris")) e.target.blur(); });
+  async function dsAyrintiYukle(id) {
+    try { dsAyrinti = await api(`/api/dosyalar/${id}`); } catch (e) { bildir(e.message); return; }
+    $("#ds-alt").hidden = false;
+    $("#ds-yuklemeler-baslik").textContent = `Yüklemeler — ${dsAyrinti.dosya.ad}`;
+    dsYuklemelerCiz(); dsBaskilarCiz();
+  }
+  function dsYuklemelerCiz() {
+    const y = dsAyrinti.yuklemeler;
+    $("#ds-yuklemeler tbody").innerHTML = y.map(u => `<tr data-id="${u.id}" class="${u.id === dsYuklemeSecili ? "secili" : ""} ${u.basarili ? "" : "kritik"}">
+      <td>${kacis(u.kullanici_adi || "–")}</td><td class="zaman">${tarih(u.zaman)}</td><td class="eylem">${kacis(u.yazici_adi || ("#" + u.yazici_id))}</td>
+      <td>${u.basarili ? (u.baslatildi ? '<span class="sonuc-tamamlandi">Yüklendi, baskı başlatıldı</span>' : "Yüklendi") : `<span class="sonuc-hata" title="${kacis(u.hata)}">Başarısız</span>`}</td></tr>`).join("")
+      || '<tr><td colspan="4" class="ipucu">Bu dosya henüz hiçbir yazıcıya yüklenmedi.</td></tr>';
+    $("#ds-yuklemeler-sayi").textContent = y.length ? `${y.length} yükleme${dsYuklemeSecili != null ? " · seçili yüklemeye ait baskılar gösteriliyor" : " · tümü"}` : "";
+  }
+  function dsBaskilarCiz() {
+    const liste = dsAyrinti.baskilar.filter(b => dsYuklemeSecili == null || b.yukleme_id === dsYuklemeSecili);
+    const sec = dsYuklemeSecili != null ? dsAyrinti.yuklemeler.find(u => u.id === dsYuklemeSecili) : null;
+    $("#ds-baskilar-baslik").textContent = sec ? `Baskılar — ${sec.yazici_adi}, ${tarih(sec.zaman)} yüklemesi` : "Baskılar — tüm yüklemeler";
+    $("#ds-baskilar tbody").innerHTML = liste.map(b => `<tr class="${b.sonuc === "hata" || b.sonuc === "iptal" ? "kritik" : ""}">
+      <td class="eylem">${kacis(b.yazici_adi || ("#" + b.yazici_id))}</td><td class="zaman">${tarih(b.baslama)}</td><td class="zaman">${b.bitis ? tarih(b.bitis) : '<span class="sonuc-suruyor">sürüyor</span>'}</td>
+      <td>${b.hata_kodu ? `<span class="sonuc-hata" title="kod ${kacis(b.hata_kodu)}">${kacis(b.hata_metni || ("kod " + b.hata_kodu))}</span>` : `<span class="sonuc-${b.sonuc}">${SONUC_AD[b.sonuc] || b.sonuc}</span>`}</td>
+      <td>${b.toplam_sn != null ? sureTam(b.toplam_sn) : "–"}${b.ilerleme != null && b.sonuc !== "tamamlandi" ? ` <small class="ipucu">(%${Math.round(b.ilerleme)})</small>` : ""}</td></tr>`).join("")
+      || `<tr><td colspan="5" class="ipucu">${sec ? "Bu yüklemeye ait baskı kaydı yok." : "Bu dosya için baskı kaydı yok."}</td></tr>`;
+    $("#ds-baskilar-sayi").textContent = liste.length ? `${liste.length} baskı` : "";
+  }
+  $("#ds-yuklemeler").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr[data-id]"); if (!tr) return;
+    const id = Number(tr.dataset.id); dsYuklemeSecili = dsYuklemeSecili === id ? null : id;
+    dsYuklemelerCiz(); dsBaskilarCiz();
+  });
+  $("#ds-dosya").addEventListener("change", () => {
+    const dosya = $("#ds-dosya").files[0]; if (!dosya) return;
+    const aciklama = prompt(`"${dosya.name}" için açıklama (isteğe bağlı):`, "");
+    if (aciklama === null) { $("#ds-dosya").value = ""; return; }
+    const fd = new FormData(); fd.append("file", dosya, dosya.name); fd.append("aciklama", aciklama);
+    const xhr = new XMLHttpRequest(); xhr.open("POST", "/api/dosyalar");
+    $("#ds-sayi").textContent = `Yükleniyor: ${dosya.name}…`;
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) $("#ds-sayi").textContent = `Yükleniyor: ${dosya.name} (%${Math.round(100 * e.loaded / e.total)})`; };
     xhr.onload = () => {
-      yuklemeler.delete(id); cizKart(st.yazicilar.get(id));
+      $("#ds-dosya").value = "";
       let v = {}; try { v = JSON.parse(xhr.responseText); } catch (e) { /* boş */ }
       if (xhr.status === 401) { location.href = "/giris"; return; }
-      if (xhr.status >= 200 && xhr.status < 300) bildir(v.baslatildi ? `${y.ad}: ${v.dosya_adi} yüklendi, baskı başlatıldı` : `${y.ad}: ${v.dosya_adi} yüklendi ama baskı başlatılamadı (bağlantı yok)`, 6000);
-      else bildir(`${y.ad}: yükleme başarısız — ${v.hata || xhr.statusText}`, 8000);
+      if (xhr.status >= 200 && xhr.status < 300) { bildir(v.yeni ? `${v.dosya.ad} kütüphaneye eklendi` : `${v.dosya.ad} zaten kütüphanede (aynı içerik)`, 5000); dsSecili = v.dosya.id; dosyaSistemiAc(); }
+      else { bildir(`Yükleme başarısız — ${v.hata || xhr.statusText}`, 8000); dsTablo(); }
     };
-    xhr.onerror = () => { yuklemeler.delete(id); cizKart(st.yazicilar.get(id)); bildir(`${y.ad}: yükleme sırasında ağ hatası`, 8000); };
+    xhr.onerror = () => { $("#ds-dosya").value = ""; bildir("Yükleme sırasında ağ hatası", 8000); dsTablo(); };
     xhr.send(fd);
-  }
+  });
+
+  // ---------- yazıcı adı: gözetmen dahil herkes değiştirebilir ----------
+  $("#ay-ad-duzenle").addEventListener("click", async () => {
+    const y = st.yazicilar.get(st.acikYazici); if (!y) return;
+    const ad = prompt("Yazıcının yeni adı:", y.ad); if (ad === null) return;
+    const temiz = ad.trim(); if (!temiz || temiz === y.ad) return;
+    try { await put(`/api/yazicilar/${y.id}/ad`, { ad: temiz }); bildir(`Yazıcı adı "${temiz}" olarak değiştirildi`); }
+    catch (err) { bildir(err.message, 6000); }
+  });
   $$(".uyg[data-modul]").forEach(b => b.addEventListener("click", () => modulAc(b.dataset.modul)));
   $("#btn-uygulamalar").addEventListener("click", (e) => { e.stopPropagation(); const m = $("#menu-uygulamalar"), acik = m.hidden; menuKapat(); m.hidden = !acik; $("#btn-uygulamalar").classList.toggle("acik", acik); });
   $("#btn-avatar").addEventListener("click", (e) => { e.stopPropagation(); const m = $("#menu-hesap"), acik = m.hidden; menuKapat(); m.hidden = !acik; });

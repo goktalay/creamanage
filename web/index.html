@@ -31,6 +31,7 @@
       <button class="uyg" data-modul="yazicilar"><span class="uyg-ikon">🖨️</span>Yazıcılar</button>
       <button class="uyg" data-modul="dosya_listesi"><span class="uyg-ikon">📋</span>Dosya Listesi</button>
       <button class="uyg" data-modul="dosya_yoneticisi" data-rol="gozetmen"><span class="uyg-ikon">📤</span>Dosya Yöneticisi</button>
+      <button class="uyg" data-modul="dosya_sistemi"><span class="uyg-ikon">🗂️</span>Dosya Sistemi</button>
       <button class="uyg" data-modul="olaylar"><span class="uyg-ikon">🔔</span>Olaylar</button>
       <button class="uyg" data-modul="bildirimler" data-rol="sistem_yoneticisi"><span class="uyg-ikon">✈️</span>Bildirimler</button>
       <button class="uyg" data-modul="kullanicilar" data-rol="sistem_yoneticisi"><span class="uyg-ikon">👥</span>Kullanıcılar</button>
@@ -83,7 +84,46 @@
 
   <section class="modul" id="modul-dosya_yoneticisi" hidden>
     <div class="yukle-kartlar" id="yukle"></div>
-    <input type="file" id="dosya-secici" accept=".gcode,.gz,.gco,.g,.3mf" hidden>
+  </section>
+
+  <section class="modul" id="modul-dosya_sistemi" hidden>
+    <div class="arac-cubugu ds-arac">
+      <input type="search" id="ds-arama" placeholder="Dosya adı, açıklama, yükleyen ara…">
+      <select id="ds-filtre"><option value="">Aktif + pasif</option><option value="aktif">Yalnız aktif</option><option value="pasif">Yalnız pasif</option></select>
+      <span class="bosluk"></span>
+      <span class="ipucu" id="ds-sayi"></span>
+      <label class="btn btn-birincil" for="ds-dosya" data-rol="yazici_yoneticisi">+ Dosya Ekle</label>
+      <input type="file" id="ds-dosya" accept=".gcode,.gz,.gco,.g,.3mf" hidden>
+    </div>
+    <div class="panel ds-panel">
+      <div class="tablo-kaydir ds-kaydir">
+        <table class="tablo ds-tablo" id="ds-tablo">
+          <thead><tr><th>Durumu</th><th>Yükleme Zamanı</th><th>Yükleyen Kullanıcı</th><th>Dosya Adı</th><th>Dosya Açıklaması</th><th class="sag-hiza">Dosya Boyutu</th><th>Dosya Resmi</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="ipucu" id="ds-bos" hidden>Kütüphanede henüz dosya yok. "Dosya Ekle" ile G-code ekleyin; Dosya Yöneticisi'nden yazıcıya gönderilen dosyalar da buraya kaydedilir.</p>
+    </div>
+    <div class="ds-alt" id="ds-alt" hidden>
+      <div class="panel">
+        <div class="satir arada ds-baslik"><h3 id="ds-yuklemeler-baslik">Yüklemeler</h3><span class="ipucu" id="ds-yuklemeler-sayi"></span></div>
+        <div class="tablo-kaydir ds-kaydir-kucuk">
+          <table class="tablo gecmis ds-secilebilir" id="ds-yuklemeler">
+            <thead><tr><th>Yükleyen</th><th>Yükleme Zamanı</th><th>Yüklenen Yazıcı</th><th>Sonuç</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="satir arada ds-baslik"><h3 id="ds-baskilar-baslik">Baskılar</h3><span class="ipucu" id="ds-baskilar-sayi"></span></div>
+        <div class="tablo-kaydir ds-kaydir-kucuk">
+          <table class="tablo gecmis" id="ds-baskilar">
+            <thead><tr><th>Yazıcı</th><th>Başlatma Zamanı</th><th>Bitirme Zamanı</th><th>Hata Durumu</th><th>Toplam Baskı Süresi</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section class="modul dar" id="modul-olaylar" hidden>
@@ -182,7 +222,7 @@
     <header class="tam-ust">
       <div class="ay-kimlik">
         <span class="ay-ikon" id="ay-ikon"></span>
-        <div><h2 id="ay-baslik">Yazıcı</h2><small class="ipucu" id="ay-altbaslik"></small></div>
+        <div><h2 id="ay-baslik">Yazıcı <button type="button" class="kalem" id="ay-ad-duzenle" title="Yazıcı adını değiştir" aria-label="Yazıcı adını değiştir">✎</button></h2><small class="ipucu" id="ay-altbaslik"></small></div>
       </div>
       <div class="tam-ust-sag">
         <button class="ikon-btn" id="ay-menu-btn" title="Modüller" aria-haspopup="true">
@@ -225,7 +265,7 @@
           </div>
           <div class="islem-kart">
             <h3>Dosya yükle ve yazdır</h3>
-            <p class="ipucu">G-code seçilir, yazıcıya yüklenir ve baskı başlatılır. Süren bir iş varsa durdurulur; onay istenir.</p>
+            <p class="ipucu">Dosya Sistemi'ndeki aktif dosyalardan biri seçilir, yazıcıya yüklenir ve baskı başlatılır. Süren bir iş varsa durdurulur; onay istenir.</p>
             <button class="btn komut btn-birincil" id="ay-dosya-btn"><span class="ki" data-ikon="file"></span>Dosya Seç ve Yazdır</button>
           </div>
         </div>
@@ -380,6 +420,19 @@
       <thead><tr><th>Zaman</th><th>Kullanıcı</th><th>İşlem</th><th>Hedef</th><th>Ayrıntı</th><th>IP</th></tr></thead>
       <tbody></tbody>
     </table>
+  </div>
+</div>
+
+<!-- Kütüphaneden dosya seç / yazıcı seç -->
+<div class="ortu" id="ortu-secici" hidden>
+  <div class="modal genis secici">
+    <div class="modal-baslik"><div><h2 id="secici-baslik">Dosya Seç</h2><small class="ipucu" id="secici-alt"></small></div><button class="btn btn-ikincil" data-kapat="ortu-secici">Kapat</button></div>
+    <div class="satir"><input type="search" id="secici-arama" placeholder="Ara…"><span class="bosluk"></span><span class="ipucu" id="secici-sayi"></span></div>
+    <div class="tablo-kaydir secici-kaydir">
+      <table class="tablo ds-secilebilir" id="secici-tablo"><thead></thead><tbody></tbody></table>
+    </div>
+    <p class="ipucu" id="secici-bos" hidden></p>
+    <div class="satir sag"><span class="ipucu" id="secici-uyari">Seçilen dosya yazıcıya yüklenir ve baskı başlatılır. Bu işlem yazıcıdaki mevcut işlemi durduracak.</span><button class="btn btn-birincil" id="secici-onay" disabled>Gönder ve Yazdır</button></div>
   </div>
 </div>
 
