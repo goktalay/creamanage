@@ -20,6 +20,13 @@ Yazıcılara müdahale gerekmez: stok Creality yazılımının yerel ağda sundu
   listelenir; bir yükleme seçilince yalnız ona ait baskılar kalır. Zincir: Dosya → Yükleme →
   Baskı (başlatma/bitirme) yazıcı telemetrisinden otomatik izlenir (tamamlandı / hata /
   iptal / sürüyor).
+- **Büyük dosya yükleme (parçalı):** tarayıcı dosyayı 4 MB'lık parçalarla gönderir
+  (`POST /api/dosyalar/yukleme` → `PUT …/{kimlik}?ofset=` → `POST …/bitir`); dosya başına ilerleme,
+  hız ve kalan süre gösterilir. Ters vekil (nginx) gövde sınırı yüzünden 413 gelirse parça
+  kendiliğinden küçültülür (256 KB'a kadar), ağ hatasında aynı parça yeniden denenir. Geçici dosya
+  `/tmp` yerine kütüphane dizininde (`…_dosyalar/gecici/`) biriktirilir; böylece PrivateTmp/tmpfs
+  boyutu ve diskler arası kopya sorunu olmaz. Özet (SHA-256) ve önizleme çıkarma ayrı iş
+  parçacığında yapılır, yazıcı bağlantıları bloklanmaz. Üst sınır 1 GB.
 - **Dosya seçimi kütüphaneden:** Dosya Yöneticisi kartları ve ayrıntıdaki "Dosya Seç ve
   Yazdır" artık bilgisayardan dosya istemez; Dosya Sistemi'ndeki **aktif** dosyaları listeler,
   "mevcut işlemi durduracak" onayından sonra gönderir.
@@ -163,6 +170,22 @@ kullanılmazsa düşer), tarayıcıya yalnız HttpOnly çerez verilir. 5 başar�
 Ortam değişkenleri: `CREAMANAGE_HOST`, `CREAMANAGE_PORT`, `CREAMANAGE_VERITABANI`,
 `CREAMANAGE_TELEMETRI`, `CREAMANAGE_TELEMETRI_GUN`, `CREAMANAGE_DOSYALAR`, `CREAMANAGE_HATA_KODLARI`, `CREAMANAGE_LOG`. Komut satırı: `--host`, `--port`, `--veritabani`, `--telemetri`, `--telemetri-gun`, `--dosyalar`, `--log`.
 
+Ters vekil (nginx) arkasında çalıştırıyorsanız büyük dosya yüklemesi için vekilin gövde sınırını
+ve tamponlamasını ayarlayın; aksi halde tarayıcı 413 alır (arayüz parçaları küçülterek yine de
+yükler, ancak yavaşlar):
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8090;
+    client_max_body_size 1g;
+    proxy_request_buffering off;
+    proxy_read_timeout 600s;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+}
+```
+
 Sunucu, yazıcılarla **aynı yerel ağda** (ya da 9999 portuna yönlendirilmiş bir ağda)
 olmalıdır. Tarama için alt ağ en fazla /20 (4096 adres) olabilir.
 
@@ -256,6 +279,7 @@ testler/           birim ve uçtan uca testler
 | `POST /api/yazicilar/{id}/dosya` | multipart `file` (+`baslat`=1/0): kütüphaneye ekle, yükle ve yazdır (yazıcı yöneticisi) |
 | `PUT /api/yazicilar/{id}/ad` | `{ad}` yalnız ad değişikliği (gözetmen dahil herkes) |
 | `GET /api/dosyalar?durum=aktif\|pasif`, `POST /api/dosyalar` | kütüphane listesi (herkes) / multipart `file` + `aciklama` ile ekleme (yazıcı yöneticisi) |
+| `POST /api/dosyalar/yukleme` `{ad, boyut, aciklama?}` → `{kimlik, parca_bayt}`; `PUT /api/dosyalar/yukleme/{kimlik}?ofset=N` (ham bayt); `POST …/{kimlik}/bitir`, `POST …/{kimlik}/iptal` | parçalı (büyük dosya) yükleme; yanlış ofsette 409 + `alinan` |
 | `GET/PUT/DELETE /api/dosyalar/{id}` | ayrıntı (+yüklemeler, +baskılar) / `{aciklama?, durum?}` / sil (sistem yöneticisi) |
 | `GET /api/dosyalar/{id}/resim`, `GET /api/dosyalar/{id}/indir` | önizleme PNG / dosyayı indir |
 | `POST /api/dosyalar/{id}/gonder` | `{yazici_id, baslat?}` kütüphanedeki aktif dosyayı yazıcıya yükle ve yazdır |

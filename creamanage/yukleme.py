@@ -23,6 +23,7 @@ HTTP_PORTLAR = (80, 4408)                   # stok web sunucusu; bazı sürümle
 GCODE_DIZINI_VARSAYILAN = "/mnt/UDISK/printer_data/gcodes"   # K2 ailesi (K1: /usr/data/printer_data/gcodes)
 IZINLI_UZANTILAR = (".gcode", ".gcode.gz", ".gco", ".g", ".3mf")
 EN_BUYUK_DOSYA = 1024 * 1024 * 1024         # 1 GB
+PARCA_BAYT = 4 * 1024 * 1024               # tarayıcıdan parçalı yüklemede önerilen parça boyutu
 _TR = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
 MODEL_ADLARI = {"F008": "K2 Plus", "F012": "K2 Pro", "F021": "K2", "F022": "SPARKX i7",
                 "F001": "K1", "F002": "K1 Max", "F005": "K1C", "F011": "K1 SE"}

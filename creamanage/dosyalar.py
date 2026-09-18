@@ -16,6 +16,8 @@ import io
 import logging
 import re
 import shutil
+import time
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -100,6 +102,23 @@ class DosyaKutuphanesi:
         self.dizin = Path(dizin)
         self.dizin.mkdir(parents=True, exist_ok=True)
         (self.dizin / "resimler").mkdir(exist_ok=True)
+        self.gecici_dizin = self.dizin / "gecici"      # yüklemeler kütüphaneyle aynı diskte biriktirilir (taşıma = yeniden adlandırma)
+        self.gecici_dizin.mkdir(exist_ok=True)
+
+    def gecici_yol(self, ad: str = "") -> Path:
+        """Kütüphane diskinde benzersiz geçici dosya yolu (henüz oluşturulmamış)."""
+        return self.gecici_dizin / f"{uuid.uuid4().hex}_{ad or 'dosya'}"
+
+    def eski_gecicileri_sil(self, en_eski_sn: float = 6 * 3600) -> int:
+        """Yarım kalmış yüklemeleri temizler; silinen sayısını döndürür."""
+        sinir = time.time() - en_eski_sn; n = 0
+        for yol in self.gecici_dizin.glob("*"):
+            try:
+                if yol.is_file() and yol.stat().st_mtime < sinir:
+                    yol.unlink(); n += 1
+            except OSError:
+                pass
+        return n
 
     def ekle(self, gecici_yol: str | Path, ad: str, kullanici: dict | None, aciklama: str = "") -> tuple[dict, bool]:
         """Geçici dosyayı kütüphaneye taşır. (kayıt, yeni_mi) döndürür; aynı içerik varsa onu verir."""

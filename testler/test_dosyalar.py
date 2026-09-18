@@ -193,6 +193,44 @@ class ApiTesti(unittest.IsolatedAsyncioTestCase):
         for e in ("dosya_kutuphane_ekledi", "dosya_kutuphane_ayni", "dosya_yukledi"):
             self.assertIn(e, eylemler)
 
+    async def test_parcali_yukleme(self):
+        """Büyük dosya: baslat → parçalar (PUT, ofset) → bitir; yanlış ofset 409, iptal, başkasının yüklemesi 403."""
+        icerik = self.gcode * 40                                     # ~1.5 MB, 3 parçaya bölünür
+        r = await self.yon.post("/api/dosyalar/yukleme", json={"ad": "Büyük Parça.gcode", "boyut": len(icerik), "aciklama": "parçalı"})
+        self.assertEqual(r.status, 201, await r.text()); v = await r.json(); kimlik = v["kimlik"]
+        self.assertEqual(v["parca_bayt"], 4 * 1024 * 1024)
+        self.assertTrue(list((self.dizin / "dosyalar" / "gecici").glob("*_Buyuk_Parca.gcode")))
+        parca = 600_000; ofset = 0
+        while ofset < len(icerik):
+            r = await self.yon.put(f"/api/dosyalar/yukleme/{kimlik}?ofset={ofset}", data=icerik[ofset:ofset + parca])
+            self.assertEqual(r.status, 200, await r.text()); ofset = (await r.json())["alinan"]
+        # yanlış ofset → 409 ve doğru konum bildirilir
+        r = await self.yon.put(f"/api/dosyalar/yukleme/{kimlik}?ofset=5", data=b"x"); self.assertEqual(r.status, 409); self.assertEqual((await r.json())["alinan"], len(icerik))
+        # fazla veri → 413
+        r = await self.yon.put(f"/api/dosyalar/yukleme/{kimlik}?ofset={len(icerik)}", data=b"x"); self.assertEqual(r.status, 413)
+        # başka kullanıcı bitiremez
+        r = await self.goz.post(f"/api/dosyalar/yukleme/{kimlik}/bitir"); self.assertEqual(r.status, 403)
+        r = await self.yon.post(f"/api/dosyalar/yukleme/{kimlik}/bitir"); self.assertEqual(r.status, 201, await r.text()); v = await r.json()
+        self.assertTrue(v["yeni"]); d = v["dosya"]
+        self.assertEqual((d["ad"], d["boyut"], d["aciklama"], d["yukleyen_adi"]), ("Buyuk_Parca.gcode", len(icerik), "parçalı", "yon"))
+        self.assertTrue(d["resim_var"]); self.assertEqual(Path(self.vt.dosya(d["id"])["yol"]).stat().st_size, len(icerik))
+        self.assertEqual(list((self.dizin / "dosyalar" / "gecici").glob("*")), [])            # geçici kalmadı
+        r = await self.yon.post(f"/api/dosyalar/yukleme/{kimlik}/bitir"); self.assertEqual(r.status, 404)
+        # eksik veriyle bitirme 409; iptal geçici dosyayı siler
+        r = await self.yon.post("/api/dosyalar/yukleme", json={"ad": "y.gcode", "boyut": 10}); kimlik2 = (await r.json())["kimlik"]
+        r = await self.yon.post(f"/api/dosyalar/yukleme/{kimlik2}/bitir"); self.assertEqual(r.status, 409)
+        r = await self.yon.post(f"/api/dosyalar/yukleme/{kimlik2}/iptal"); self.assertEqual(r.status, 200)
+        self.assertEqual(list((self.dizin / "dosyalar" / "gecici").glob("*")), [])
+        # aynı içerik parçalı gelirse yeni kayıt açılmaz
+        r = await self.yon.post("/api/dosyalar/yukleme", json={"ad": "kopya.gcode", "boyut": len(icerik)}); kimlik3 = (await r.json())["kimlik"]
+        r = await self.yon.put(f"/api/dosyalar/yukleme/{kimlik3}?ofset=0", data=icerik); self.assertEqual(r.status, 200)
+        r = await self.yon.post(f"/api/dosyalar/yukleme/{kimlik3}/bitir"); self.assertEqual(r.status, 201); self.assertFalse((await r.json())["yeni"])
+        self.assertEqual(len(self.vt.dosyalar()), 1)
+        # geçersiz istekler ve rol
+        r = await self.yon.post("/api/dosyalar/yukleme", json={"ad": "v.exe", "boyut": 5}); self.assertEqual(r.status, 400)
+        r = await self.yon.post("/api/dosyalar/yukleme", json={"ad": "v.gcode", "boyut": 0}); self.assertEqual(r.status, 400)
+        r = await self.goz.post("/api/dosyalar/yukleme", json={"ad": "v.gcode", "boyut": 5}); self.assertEqual(r.status, 403)
+
     async def test_eski_uc_kutuphaneye_kaydeder(self):
         """POST /api/yazicilar/{id}/dosya artık dosyayı kütüphaneye ekleyip oradan gönderir."""
         r = await self.yon.post(f"/api/yazicilar/{self.yid}/dosya", data=self._form(self.gcode, "Eski_Yol.gcode", baslat="0"))

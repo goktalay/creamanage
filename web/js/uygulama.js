@@ -1117,6 +1117,7 @@
       ${k.onizleme ? `<img class="ds-resim" src="${k.onizleme}" alt="">` : '<span class="ds-resim-yok">önizleme yok</span>'}
       <div><div class="sd-ad">${kacis(k.dosya.name)}</div><div class="sd-bilgi">${boyutMetin(k.dosya.size)}${k.tahmini ? " · tahmini " + kacis(k.tahmini) : ""}</div>
         ${k.durum === "tamam" ? `<div class="sd-sonuc sonuc-tamamlandi">${kacis(k.mesaj)}</div>` : k.durum === "hatali" ? `<div class="sd-sonuc sonuc-hata">${kacis(k.mesaj)}</div>` :
+        k.durum === "yukleniyor" ? `<div class="sd-ilerleme"><progress max="100" value="${k.yuzde || 0}"></progress><div class="sd-ilerleme-metin"><b>%${k.yuzde || 0}</b><span>${kacis(k.ilerlemeMetin || "")}</span></div></div>` :
         `<input type="text" class="sd-aciklama" placeholder="Açıklama (isteğe bağlı): parça, malzeme, katman…" value="${kacis(k.aciklama)}" maxlength="500" ${deYukleniyor ? "disabled" : ""}>`}</div>
       ${deYukleniyor || k.durum === "tamam" ? "<span></span>" : `<button type="button" class="sd-kaldir" title="Listeden çıkar" aria-label="Listeden çıkar">×</button>`}
     </div>`).join("");
@@ -1157,21 +1158,52 @@
   alan.addEventListener("drop", (e) => deDosyalarEkle(e.dataTransfer.files));
   $("#secilen-dosyalar").addEventListener("input", (e) => { const g = e.target.closest(".sd-aciklama"); if (g) deListe[Number(g.closest(".sd").dataset.i)].aciklama = g.value; });
   $("#secilen-dosyalar").addEventListener("click", (e) => { const b = e.target.closest(".sd-kaldir"); if (!b || deYukleniyor) return; deListe.splice(Number(b.closest(".sd").dataset.i), 1); deCiz(); });
-  function deTekYukle(k, toplamYuzde) {
+  // Parçalı yükleme: dosya PARCA boyutunda dilimlerle gönderilir. Ters vekil (nginx) gövde sınırı 413 verirse
+  // parça küçültülür; ağ hatasında aynı parça yeniden denenir. İlerleme, hız ve kalan süre kartta gösterilir.
+  let parcaBayt = 4 * 1024 * 1024;
+  function xhrGonder(yontem, url, govde, ilerleme) {
     return new Promise((coz) => {
-      const fd = new FormData(); fd.append("file", k.dosya, k.dosya.name); fd.append("aciklama", k.aciklama.trim());
-      const xhr = new XMLHttpRequest(); xhr.open("POST", "/api/dosyalar");
-      xhr.upload.onprogress = (e) => { if (e.lengthComputable) toplamYuzde(e.loaded / e.total); };
-      xhr.onload = () => {
-        let v = {}; try { v = JSON.parse(xhr.responseText); } catch (err) { /* boş */ }
-        if (xhr.status === 401) { location.href = "/giris"; return; }
-        if (xhr.status >= 200 && xhr.status < 300) { k.durum = "tamam"; k.mesaj = v.yeni ? "Kütüphaneye eklendi" : `Aynı içerik zaten kütüphanede: ${v.dosya.ad}`; k.sonuc = v.dosya; }
-        else { k.durum = "hatali"; k.mesaj = "Yüklenemedi: " + (v.hata || xhr.statusText); }
-        coz();
-      };
-      xhr.onerror = () => { k.durum = "hatali"; k.mesaj = "Ağ hatası"; coz(); };
-      xhr.send(fd);
+      const xhr = new XMLHttpRequest(); xhr.open(yontem, url);
+      if (ilerleme) xhr.upload.onprogress = (e) => { if (e.lengthComputable) ilerleme(e.loaded); };
+      xhr.onload = () => { let v = {}; try { v = JSON.parse(xhr.responseText); } catch (e) { /* HTML hata sayfası (vekil) */ } coz({ durum: xhr.status, veri: v, metin: xhr.statusText }); };
+      xhr.onerror = () => coz({ durum: 0, veri: {}, metin: "ağ hatası" });
+      xhr.ontimeout = () => coz({ durum: 0, veri: {}, metin: "zaman aşımı" });
+      xhr.timeout = 10 * 60 * 1000;
+      if (govde instanceof Blob) xhr.setRequestHeader("Content-Type", "application/octet-stream"); else if (govde != null) xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.send(govde == null ? null : (govde instanceof Blob ? govde : JSON.stringify(govde)));
     });
+  }
+  function hizMetin(bs) { return bs >= 1048576 ? (bs / 1048576).toFixed(1) + " MB/s" : Math.round(bs / 1024) + " KB/s"; }
+  async function deTekYukle(k, toplamYuzde) {
+    const dosya = k.dosya; k.durum = "yukleniyor"; k.yuzde = 0; k.ilerlemeMetin = "başlatılıyor…"; deCiz();
+    const bas = await xhrGonder("POST", "/api/dosyalar/yukleme", { ad: dosya.name, boyut: dosya.size, aciklama: k.aciklama.trim() });
+    if (bas.durum === 401) { location.href = "/giris"; return; }
+    if (bas.durum !== 201) { k.durum = "hatali"; k.mesaj = "Yüklenemedi: " + (bas.veri.hata || bas.metin); deCiz(); return; }
+    const kimlik = bas.veri.kimlik; if (bas.veri.parca_bayt) parcaBayt = Math.min(parcaBayt, bas.veri.parca_bayt);
+    const t0 = Date.now(); let gonderilen = 0, deneme = 0;
+    const guncelle = (ekstra) => {
+      const toplam = gonderilen + (ekstra || 0), gecen = (Date.now() - t0) / 1000, hiz = gecen > 0.3 ? toplam / gecen : 0;
+      k.yuzde = Math.min(100, Math.floor(100 * toplam / dosya.size)); toplamYuzde(toplam / dosya.size);
+      k.ilerlemeMetin = `${boyutMetin(toplam)} / ${boyutMetin(dosya.size)}${hiz ? " · " + hizMetin(hiz) + " · kalan " + sureTam((dosya.size - toplam) / hiz) : ""}`;
+      const kart = $(`.sd[data-i="${deListe.indexOf(k)}"]`);
+      if (kart) { const pr = $("progress", kart); if (pr) pr.value = k.yuzde; const m = $(".sd-ilerleme-metin", kart); if (m) m.innerHTML = `<b>%${k.yuzde}</b><span>${kacis(k.ilerlemeMetin)}</span>`; }
+    };
+    while (gonderilen < dosya.size) {
+      const parca = dosya.slice(gonderilen, Math.min(dosya.size, gonderilen + parcaBayt));
+      const c = await xhrGonder("PUT", `/api/dosyalar/yukleme/${kimlik}?ofset=${gonderilen}`, parca, (yuklenen) => guncelle(yuklenen));
+      if (c.durum === 401) { location.href = "/giris"; return; }
+      if (c.durum === 200) { gonderilen = c.veri.alinan; deneme = 0; guncelle(0); continue; }
+      if (c.durum === 409 && c.veri.alinan != null) { gonderilen = c.veri.alinan; continue; }            // sunucunun bildiği yerden sür
+      if (c.durum === 413 && parcaBayt > 256 * 1024) { parcaBayt = Math.max(256 * 1024, Math.floor(parcaBayt / 2)); continue; }   // vekil gövde sınırı: parçayı küçült
+      if ((c.durum === 0 || c.durum >= 500) && deneme < 5) { deneme++; k.ilerlemeMetin = `bağlantı hatası, yeniden deneniyor (${deneme}/5)…`; deCiz(); await new Promise(r => setTimeout(r, 1000 * deneme)); continue; }
+      k.durum = "hatali"; k.mesaj = "Yüklenemedi: " + (c.veri.hata || c.metin || ("HTTP " + c.durum)) + (c.durum === 413 ? " (sunucu ya da ters vekil gövde sınırı; README: nginx client_max_body_size)" : "");
+      deCiz(); xhrGonder("POST", `/api/dosyalar/yukleme/${kimlik}/iptal`); return;
+    }
+    k.ilerlemeMetin = "kaydediliyor (özet ve önizleme çıkarılıyor)…"; deCiz();
+    const bitir = await xhrGonder("POST", `/api/dosyalar/yukleme/${kimlik}/bitir`);
+    if (bitir.durum === 201) { k.durum = "tamam"; k.mesaj = bitir.veri.yeni ? "Kütüphaneye eklendi" : `Aynı içerik zaten kütüphanede: ${bitir.veri.dosya.ad}`; k.sonuc = bitir.veri.dosya; }
+    else { k.durum = "hatali"; k.mesaj = "Kaydedilemedi: " + (bitir.veri.hata || bitir.metin); }
+    deCiz();
   }
   $("#dosya-ekle-form").addEventListener("submit", async (e) => {
     e.preventDefault(); if (deYukleniyor) return;
@@ -1179,7 +1211,7 @@
     deYukleniyor = true; deCiz(); const cubuk = $("#de-ilerleme"); cubuk.hidden = false; cubuk.value = 0;
     const toplam = bekleyen.reduce((t, k) => t + k.dosya.size, 0); let biten = 0;
     for (let i = 0; i < bekleyen.length; i++) {
-      const k = bekleyen[i]; k.durum = ""; $("#de-durum").textContent = `Yükleniyor ${i + 1}/${bekleyen.length}: ${k.dosya.name}`;
+      const k = bekleyen[i]; $("#de-durum").textContent = `Yükleniyor ${i + 1}/${bekleyen.length}: ${k.dosya.name}`;
       await deTekYukle(k, (oran) => { cubuk.value = Math.round(100 * (biten + oran * k.dosya.size) / Math.max(1, toplam)); });
       biten += k.dosya.size; cubuk.value = Math.round(100 * biten / Math.max(1, toplam));
       if (k.durum === "tamam" && k.sonuc && !$("#de-aktif").checked) { try { await put(`/api/dosyalar/${k.sonuc.id}`, { durum: "pasif" }); } catch (err) { /* liste yenilenince görülür */ } }

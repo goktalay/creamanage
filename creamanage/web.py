@@ -7,6 +7,8 @@ import json
 import logging
 import os
 import tempfile
+import time
+import uuid
 import weakref
 from pathlib import Path
 
@@ -446,9 +448,12 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
                     dosya_adi = Y.guvenli_dosya_adi(parca.filename or "")
                     if not Y.uzanti_izinli_mi(dosya_adi):
                         return _hata(f"yalnız {', '.join(Y.IZINLI_UZANTILAR)} dosyaları yüklenebilir")
-                    fd, gecici = tempfile.mkstemp(prefix="creamanage_", suffix="_" + dosya_adi)
+                    if filo.kutuphane is not None:
+                        gecici = str(filo.kutuphane.gecici_yol(dosya_adi)); f = open(gecici, "wb")
+                    else:
+                        fd, gecici = tempfile.mkstemp(prefix="creamanage_", suffix="_" + dosya_adi); f = os.fdopen(fd, "wb")
                     boyut = 0
-                    with os.fdopen(fd, "wb") as f:
+                    with f:
                         while True:
                             veri = await parca.read_chunk(1024 * 1024)
                             if not veri:
@@ -461,7 +466,7 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
                 return _hata("file alanı eksik")
             try:
                 if filo.kutuphane is not None:
-                    d, yeni = filo.kutuphane.ekle(gecici, dosya_adi, istek["kullanici"])
+                    d, yeni = await asyncio.to_thread(filo.kutuphane.ekle, gecici, dosya_adi, istek["kullanici"])
                     gecici = None if yeni else gecici           # taşındıysa silinmez
                     _denetim(istek, "dosya_kutuphane_ekledi" if yeni else "dosya_kutuphane_ayni", d["ad"], f"{d['boyut'] // 1024} KB")
                     sonuc = await filo.dosya_gonder(d["id"], yid, baslat, istek["kullanici"])
@@ -497,8 +502,15 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
             return _hata("dosya bulunamadı", 404)
         return _json({"dosya": DosyaKutuphanesi.gorunum(d), "yuklemeler": filo.vt.yuklemeler(did), "baskilar": filo.vt.baskilar(dosya_id=did)})
 
+    async def _kutuphaneye_al(istek, kut, gecici: str, ad: str, aciklama: str):
+        """Geçici dosyayı kütüphaneye işler (hash + önizleme ayrı iş parçacığında; olay döngüsü bloklanmaz)."""
+        d, yeni = await asyncio.to_thread(kut.ekle, gecici, ad, istek["kullanici"], aciklama)
+        _denetim(istek, "dosya_kutuphane_ekledi" if yeni else "dosya_kutuphane_ayni", d["ad"], f"{d['boyut'] // 1024} KB" + (f"; {aciklama}" if aciklama else ""))
+        await filo._yayinla({"tur": "dosyalar"})
+        return _json({"dosya": DosyaKutuphanesi.gorunum(d), "yeni": yeni}, 201), yeni
+
     async def dosya_kutuphane_ekle(istek):
-        """multipart: file, aciklama — yazdırmadan kütüphaneye ekler."""
+        """multipart: file, aciklama — tek istekte yazdırmadan kütüphaneye ekler (API/komut satırı için)."""
         kut = _kut()
         okuyucu = await istek.multipart()
         ad, gecici, aciklama, boyut = "", None, "", 0
@@ -510,8 +522,8 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
                     ad = Y.guvenli_dosya_adi(parca.filename or "")
                     if not Y.uzanti_izinli_mi(ad):
                         return _hata(f"yalnız {', '.join(Y.IZINLI_UZANTILAR)} dosyaları yüklenebilir")
-                    fd, gecici = tempfile.mkstemp(prefix="creamanage_", suffix="_" + ad)
-                    with os.fdopen(fd, "wb") as f:
+                    gecici = str(kut.gecici_yol(ad))
+                    with open(gecici, "wb") as f:
                         while True:
                             veri = await parca.read_chunk(1024 * 1024)
                             if not veri:
@@ -522,18 +534,102 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
                             f.write(veri)
             if not gecici:
                 return _hata("file alanı eksik")
-            d, yeni = kut.ekle(gecici, ad, istek["kullanici"], aciklama)
+            yanit, yeni = await _kutuphaneye_al(istek, kut, gecici, ad, aciklama)
             if yeni:
                 gecici = None
-            _denetim(istek, "dosya_kutuphane_ekledi" if yeni else "dosya_kutuphane_ayni", d["ad"], f"{d['boyut'] // 1024} KB" + (f"; {aciklama}" if aciklama else ""))
-            await filo._yayinla({"tur": "dosyalar"})
-            return _json({"dosya": DosyaKutuphanesi.gorunum(d), "yeni": yeni}, 201)
+            return yanit
         finally:
             if gecici:
                 try:
                     os.unlink(gecici)
                 except OSError:
                     pass
+
+    # --- parçalı yükleme: büyük dosyalar için (ters vekil gövde sınırı, ağ kopması, ilerleme) ---
+    bekleyen_yuklemeler: dict[str, dict] = {}
+
+    def _bekleyen(istek):
+        y = bekleyen_yuklemeler.get(istek.match_info["kimlik"])
+        if y is None:
+            raise web.HTTPNotFound(text=json.dumps({"hata": "yükleme bulunamadı ya da süresi doldu"}), content_type="application/json")
+        if y["kullanici_id"] != istek["kullanici"]["id"] and istek["kullanici"]["rol"] != "sistem_yoneticisi":
+            raise web.HTTPForbidden(text=json.dumps({"hata": "bu yükleme başka bir kullanıcıya ait"}), content_type="application/json")
+        return y
+
+    def _bekleyen_sil(kimlik: str):
+        y = bekleyen_yuklemeler.pop(kimlik, None)
+        if y:
+            try:
+                os.unlink(y["yol"])
+            except OSError:
+                pass
+
+    async def yukleme_baslat(istek):
+        """{ad, boyut, aciklama?} → {kimlik, parca_bayt}. Parçalar PUT ile eklenir, bitir ile kütüphaneye alınır."""
+        kut = _kut()
+        v = await _govde(istek)
+        ad = Y.guvenli_dosya_adi(str(v.get("ad", "")))
+        if not Y.uzanti_izinli_mi(ad):
+            return _hata(f"yalnız {', '.join(Y.IZINLI_UZANTILAR)} dosyaları yüklenebilir")
+        try:
+            boyut = int(v.get("boyut", 0))
+        except (TypeError, ValueError):
+            return _hata("boyut sayı olmalı")
+        if boyut <= 0:
+            return _hata("boş dosya yüklenemez")
+        if boyut > Y.EN_BUYUK_DOSYA:
+            return _hata(f"dosya çok büyük (en fazla {Y.EN_BUYUK_DOSYA // (1024 * 1024)} MB)", 413)
+        # süresi geçmiş yarım yüklemeler
+        simdi = time.time()
+        for k in [k for k, y in bekleyen_yuklemeler.items() if simdi - y["son"] > 6 * 3600]:
+            _bekleyen_sil(k)
+        kut.eski_gecicileri_sil()
+        kimlik = uuid.uuid4().hex
+        yol = str(kut.gecici_yol(ad))
+        open(yol, "wb").close()
+        bekleyen_yuklemeler[kimlik] = {"ad": ad, "boyut": boyut, "aciklama": str(v.get("aciklama", "")).strip()[:500], "yol": yol,
+                                       "alinan": 0, "kullanici_id": istek["kullanici"]["id"], "son": simdi, "kilit": asyncio.Lock()}
+        return _json({"kimlik": kimlik, "parca_bayt": Y.PARCA_BAYT, "alinan": 0}, 201)
+
+    async def yukleme_parca(istek):
+        """PUT gövde = ham bayt; ?ofset=N (şimdiye dek alınan bayt sayısına eşit olmalı)."""
+        y = _bekleyen(istek)
+        try:
+            ofset = int(istek.query.get("ofset", "0"))
+        except ValueError:
+            return _hata("ofset sayı olmalı")
+        async with y["kilit"]:
+            if ofset != y["alinan"]:
+                return _json({"hata": "ofset uyuşmuyor", "alinan": y["alinan"]}, 409)
+            with open(y["yol"], "r+b") as f:
+                f.seek(y["alinan"])
+                async for veri in istek.content.iter_chunked(1024 * 1024):
+                    if y["alinan"] + len(veri) > y["boyut"]:
+                        return _hata("bildirilen boyuttan fazla veri", 413)
+                    f.write(veri); y["alinan"] += len(veri)
+            y["son"] = time.time()
+        return _json({"alinan": y["alinan"], "boyut": y["boyut"]})
+
+    async def yukleme_bitir(istek):
+        y = _bekleyen(istek)
+        if y["alinan"] != y["boyut"]:
+            return _json({"hata": f"eksik veri: {y['alinan']} / {y['boyut']} bayt", "alinan": y["alinan"]}, 409)
+        kimlik = istek.match_info["kimlik"]
+        try:
+            yanit, yeni = await _kutuphaneye_al(istek, _kut(), y["yol"], y["ad"], y["aciklama"])
+        except Exception:
+            _bekleyen_sil(kimlik); raise
+        bekleyen_yuklemeler.pop(kimlik, None)
+        if not yeni:
+            try:
+                os.unlink(y["yol"])
+            except OSError:
+                pass
+        return yanit
+
+    async def yukleme_iptal(istek):
+        _bekleyen(istek); _bekleyen_sil(istek.match_info["kimlik"])
+        return _json({"iptal": True})
 
     async def dosya_guncelle(istek):
         did = int(istek.match_info["id"])
@@ -807,6 +903,10 @@ def uygulama_olustur(filo: Filo, telegram: TelegramBildirici | None = None,
     app.router.add_post(r"/api/yazicilar/{id:\d+}/dosya", dosya_yukle)
     app.router.add_get("/api/dosyalar", dosyalar_liste)
     app.router.add_post("/api/dosyalar", dosya_kutuphane_ekle)
+    app.router.add_post("/api/dosyalar/yukleme", yukleme_baslat)
+    app.router.add_put(r"/api/dosyalar/yukleme/{kimlik:[0-9a-f]{32}}", yukleme_parca)
+    app.router.add_post(r"/api/dosyalar/yukleme/{kimlik:[0-9a-f]{32}}/bitir", yukleme_bitir)
+    app.router.add_post(r"/api/dosyalar/yukleme/{kimlik:[0-9a-f]{32}}/iptal", yukleme_iptal)
     app.router.add_get(r"/api/dosyalar/{id:\d+}", dosya_ayrinti)
     app.router.add_put(r"/api/dosyalar/{id:\d+}", dosya_guncelle)
     app.router.add_delete(r"/api/dosyalar/{id:\d+}", dosya_sil)
